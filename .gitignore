@@ -1,0 +1,21 @@
+# Virtual environment
+myenv/
+venv/
+.venv/
+pyvenv.cfg
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Large / generated data files
+*.parquet
+
+# OS / editor junk
+.DS_Store
+.vscode/
+*.log
+
+# Airflow local artifacts (if applicable)
+logs/
+*.pid
