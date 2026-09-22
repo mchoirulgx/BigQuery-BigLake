@@ -104,11 +104,17 @@ WHERE total_amount < 0;
 
 ---
 
+## Next Steps in Stage 1:
+Now that the BigLake connection is active and IAM permissions are configured, test it with Google Cloud's public NYC Taxi dataset:  
+**[04_time_travel_and_fail-safe.md](04_time_travel_and_fail-safe.md)**
+
+
 ## Conclusion of Stage 1
 You have validated:
 1. The structural differences between Parquet, Hive, and Iceberg.
 2. The security model and Cloud Resource connection delegation in BigLake.
 3. Converting unmanaged Hive Parquet files into a fully transactional BigLake Managed Iceberg table.
+4. Understanding how BigLake Managed Iceberg table file is used and processed.
 
 Proceed to **Stage 2: Simple Ingestion**:  
 **[../02_simple_ingestion/04_simple_parquet_external_table.md](../02_simple_ingestion/04_simple_parquet_external_table.md)**
