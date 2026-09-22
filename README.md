@@ -54,6 +54,7 @@ graph LR
 ```text
 biglake-iceberg-bq/
 ├── README.md                                          # Master playbook index and architecture portal
+├── CHANGELOG.md                                       # Detailed audit log of all refactoring & fixes
 ├── docs/                                              # 5-stage progressive documentation
 │   ├── 01_concept_why_biglake_and_iceberg/
 │   │   ├── 01_biglake_iceberg_concepts.md             # Parquet vs Hive vs Iceberg fundamentals
