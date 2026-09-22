@@ -1,8 +1,15 @@
 # Stage 4: Incremental Loading
-## Part 4.2: Canonical Reference Pipeline: Date-Prefixed Ingestion with DTS Sensor & Idempotent MERGE
+## Part 4.2: Canonical Reference Pipeline: Immutable Date-Prefix Detection (Scenario B: Zero-Deletion) with DTS Sensor & Idempotent MERGE
 
-> **Section Overview:**  
-> This is the **Canonical Reference Implementation** of the entire playbook. It integrates MySQL extraction, strict PyArrow typing, date-partitioned GCS prefixes (`export_YYYYMMDD/`), BigQuery Data Transfer Service (DTS) ingestion into a BigLake Managed Iceberg staging table, a dedicated **Airflow Sensor** to eliminate race conditions, and an idempotent BigQuery MERGE upsert with soft-delete tracking.
+> **Section Overview & Canonical Implementation of Scenario B:**  
+> This is the **Canonical Reference Implementation** of the entire playbook. It provides the production-grade architectural blueprint for **Scenario B (Filename & Prefix Detection Without Deleting Files)**.
+>
+> In many enterprise data architectures, deleting raw source data after ingestion (Scenario A) violates data governance, compliance, and disaster recovery standards. This pipeline demonstrates how to achieve 100% duplicate-free ingestion while keeping **every historical Parquet file permanently archived in GCS**:
+> 1. **Isolated Landing Prefixes:** Each execution batch lands in its own isolated date folder: `gs://<BUCKET>/data_transaksi/export_YYYYMMDD/data_*.parquet`.
+> 2. **Dynamic DTS Scoping:** The BigQuery DTS transfer configuration is parameterized to target only the active execution date's folder prefix using runtime parameters (`export_{run_time|"%Y%m%d"}/`), completely eliminating the risk of re-ingesting past partitions.
+> 3. **Zero Deletion:** Zero files are deleted from GCS. The data lake remains immutable, auditable, and replayable.
+> 4. **Race-Condition Elimination:** A dedicated `BigQueryDataTransferServiceTransferRunSensor` polls DTS until terminal completion before downstream tasks fire.
+> 5. **Idempotent MERGE:** An optimized BigQuery `MERGE` statement with partition pruning merges changes into the native serving layer.
 
 ---
 
@@ -13,7 +20,7 @@
 
 ---
 
-## 1. Architectural Blueprint
+## 1. Architectural Blueprint (Scenario B: Immutable Retention)
 
 ```mermaid
 sequenceDiagram

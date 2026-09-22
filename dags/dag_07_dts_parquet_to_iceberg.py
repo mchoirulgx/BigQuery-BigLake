@@ -23,6 +23,15 @@ WHAT TO DO:
      - Trigger manually or via daily schedule.
 
 DEMO VS. PRODUCTION NOTES:
+  - GCS STAGING LIFECYCLE (SCENARIO A VS. SCENARIO B):
+    * Scenario A (Post-Ingestion File Deletion): If DTS is configured with a static
+      wildcard path (`gs://bucket/batch_landing_zone/*.parquet`), processed files MUST
+      be deleted after transfer (via DTS's "Delete source files after transfer" or an
+      Airflow `GCSDeleteObjectsOperator`) to avoid duplicate appends on the next run.
+    * Scenario B (Filename & Prefix Detection Without Deletion): In production, keeping
+      raw Parquet files permanently in GCS is often required for compliance and replay.
+      To prevent re-ingestion without deleting files, isolate each batch in date-partitioned
+      prefixes (`export_YYYYMMDD/`) or unique filenames as demonstrated in Stage 4.
   - IMPORTANT ORCHESTRATION LESSON:
     `BigQueryDataTransferServiceStartTransferRunsOperator` triggers the transfer
     asynchronously and completes immediately (within a few seconds).

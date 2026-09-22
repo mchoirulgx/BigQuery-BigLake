@@ -1,8 +1,14 @@
 # Stage 4: Incremental Loading
-## Part 4.1: Automated Full vs. Incremental Batch Ingestion
+## Part 4.1: Automated Full vs. Incremental Batch Ingestion via Dynamic Filename Detection (Scenario B: Zero-Deletion)
 
-> **Section Overview:**  
-> A resilient data pipeline must gracefully handle cold starts (initial full load of historical records) as well as day-to-day operations (incremental delta loads). This section details how Apache Airflow dynamically inspects the destination BigQuery table's row count to toggle between a full baseline extract and daily incremental slices, uploading them as Parquet files to GCS for DTS consumption.
+> **Section Overview & Filename Detection Strategy:**  
+> A resilient data pipeline must gracefully handle cold starts (initial full load of historical records) as well as day-to-day operations (incremental delta loads). This section details how Apache Airflow dynamically inspects the destination BigQuery table's row count to toggle between a full baseline extract and daily incremental slices.
+>
+> In accordance with **Scenario B (Filename Detection Without Deletion)**, older files are never purged from GCS. Instead, Airflow tags each batch with a distinct filename signature:
+> * Cold start initialization generates: `batch_users_full_load.parquet`
+> * Recurring daily deltas generate: `batch_users_incremental_YYYYMMDD.parquet`
+>
+> This filename-scoping mechanism allows older extracted files to remain permanently archived in GCS without causing duplicate record ingestion during subsequent DTS transfer runs.
 
 ---
 
@@ -11,7 +17,7 @@
 
 ---
 
-## 1. Architectural Strategy: Dynamic Load Switching
+## 1. Architectural Strategy: Dynamic Load Switching & Filename Detection
 
 Rather than maintaining two separate DAGs for initialization and daily runs:
 
@@ -19,10 +25,11 @@ Rather than maintaining two separate DAGs for initialization and daily runs:
    ```sql
    SELECT COUNT(1) FROM `<PROJECT>.<DATASET>.dts_managed_users`
    ```
-2. **Dynamic Decision:**
+2. **Dynamic Decision & Filename Assignment (Scenario B):**
    * **If count == 0:** Table is empty (cold start). The DAG extracts **all historical records** from MySQL without a time filter and writes `batch_users_full_load.parquet`.
    * **If count > 0:** Baseline exists. The DAG extracts only records where `updated_at` falls within the previous 24-hour execution window, naming the file `batch_users_incremental_YYYYMMDD.parquet`.
-3. **Format Enforcement:** Timestamps are coerced to microsecond precision (`coerce_timestamps='us'`) before writing Parquet bytes to GCS.
+3. **Zero Deletion:** Historical files remain stored in GCS; DTS is scoped to the specific target filename or execution window.
+4. **Format Enforcement:** Timestamps are coerced to microsecond precision (`coerce_timestamps='us'`) before writing Parquet bytes to GCS.
 
 ```mermaid
 flowchart TD

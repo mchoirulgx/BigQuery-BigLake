@@ -34,6 +34,10 @@ WHAT TO DO:
      - Trigger the DAG in Airflow UI.
 
 DEMO VS. PRODUCTION NOTES:
+  - ZERO-DELETION GCS ARCHIVE (SCENARIO B):
+    * This pipeline implements Scenario B: files are NEVER deleted from GCS.
+    * Date-partitioned prefixing (`export_YYYYMMDD/`) ensures DTS only ingests
+      the active window, maintaining a full immutable raw audit trail on Cloud Storage.
   - Eliminates Race Conditions: The sensor ensures the MERGE task never executes
     before DTS finishes copying data and updating Iceberg manifests.
   - Microsecond UTC timestamps prevent `INVALID_ARGUMENT` errors.

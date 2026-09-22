@@ -1,8 +1,20 @@
 # Stage 3: Using DTS to Ingest into Iceberg
-## Part 3.1: GCS Staging and BigQuery Data Transfer Service (DTS) Setup
+## Part 3.1: GCS Staging Strategies (Post-Ingestion Deletion vs. Filename Detection) & BigQuery DTS Setup
 
-> **Section Overview:**  
-> In enterprise environments, maintaining consistency with existing data ingestion patterns often makes **BigQuery Data Transfer Service (DTS)** the preferred tool for file ingestion. However, DTS cannot ingest directly from relational databases like MySQL without an intermediary landing zone. This guide demonstrates how to combine lightweight Python extraction with GCS Parquet staging and DTS to append records into BigLake Managed Iceberg tables.
+> **Section Overview & Core Staging Strategies:**  
+> In enterprise environments, maintaining consistency with existing data ingestion patterns often makes **BigQuery Data Transfer Service (DTS)** the preferred tool for file ingestion. However, DTS cannot ingest directly from relational databases like MySQL without an intermediary landing zone in Google Cloud Storage (GCS).
+>
+> When designing the GCS staging layer for DTS ingestion, two primary operational scenarios exist:
+> 
+> 1. **Scenario A: Post-Ingestion File Deletion (Ephemeral Staging)**  
+>    Processed Parquet files are explicitly deleted from GCS once the DTS transfer run succeeds (either via DTS's native *Delete source files after transfer* setting or an orchestrator cleanup task).  
+>    * **When to use:** When GCS is treated strictly as a transient landing buffer, minimizing Cloud Storage storage costs and preventing duplicate ingestion when using a static wildcard URI (e.g., `gs://bucket/landing_zone/*.parquet`).
+> 
+> 2. **Scenario B: Filename & Prefix Detection Without Deleting (Immutable Lake Archive)**  
+>    Processed Parquet files are **never deleted** from GCS, preserving an immutable, audit-compliant data lake archive for historical replay and disaster recovery.  
+>    * **When to use:** When compliance, auditing, or operational resilience requires preserving raw source files. To avoid re-ingesting previously transferred data, DTS is configured with dynamic date-partitioned folder prefixes (e.g., `gs://bucket/data/export_YYYYMMDD/*.parquet`) or specific filename patterns matching runtime parameters.
+>
+> This guide details both staging patterns, how to configure GCS and DTS, and how to reliably append records into BigLake Managed Iceberg tables.
 
 ---
 
@@ -13,15 +25,24 @@ To bridge the gap between source databases and BigLake Managed Iceberg tables wh
 1. **Extraction (Airflow / Script):** Queries MySQL for the latest CDC window (e.g., past 24 hours).
 2. **In-Memory Transformation:** Converts the extracted DataFrame into Parquet in-memory using `io.BytesIO()`.  
    *Crucial fix:* Explicitly forces microsecond timestamp precision (`coerce_timestamps='us'`) to avoid BigQuery nanosecond rejection errors.
-3. **GCS Landing Zone:** Writes the Parquet file to `gs://<BUCKET>/dts_landing_zone/`.
+3. **GCS Landing Zone:** Writes the Parquet file to GCS:
+   * *Under Scenario A:* Staged in an ephemeral folder `gs://<BUCKET>/dts_landing_zone/*.parquet`, wiped after ingestion.
+   * *Under Scenario B:* Landed in a structured, permanent date-prefixed path `gs://<BUCKET>/data/export_YYYYMMDD/*.parquet` without deletion.
 4. **DTS Ingestion:** BigQuery DTS automatically detects new Parquet files, appends them to the BigLake Managed Iceberg table, and advances the Iceberg snapshot catalog.
 5. **Serving Layer MERGE:** A BigQuery MERGE deduplicates history and updates the native serving table.
 
 ```mermaid
-flowchart LR
-    MySQL[(MySQL DB)] -->|Extract Delta| Py[Pandas / PyArrow<br/>coerce_timestamps='us']
-    Py -->|Upload Parquet| GCS[gs://bucket/dts_landing_zone/]
-    GCS -->|DTS Transfer Run| Iceberg[(BigLake Managed Iceberg<br/>dts_managed_users)]
+flowchart TD
+    MySQL[(MySQL Source DB)] -->|Extract Delta| Py[Pandas / PyArrow<br/>coerce_timestamps='us']
+    Py -->|Upload Parquet| GCS_Choice{GCS Staging Strategy}
+    
+    subgraph Staging_Options [GCS Landing Patterns]
+        GCS_Choice -->|Scenario A: Ephemeral| GCS_Del["Landing Zone: gs://.../landing_zone/*.parquet<br/>(Delete files after transfer)"]
+        GCS_Choice -->|Scenario B: Immutable| GCS_Retain["Date Prefix: gs://.../export_YYYYMMDD/*.parquet<br/>(Retain files permanently, detect by prefix)"]
+    end
+
+    GCS_Del -->|DTS Transfer Run| Iceberg[(BigLake Managed Iceberg<br/>dts_managed_users)]
+    GCS_Retain -->|DTS Parameterized Run| Iceberg
     Iceberg -->|Scheduled MERGE| NativeBQ[(Native BigQuery<br/>dts_native_users)]
 ```
 

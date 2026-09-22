@@ -25,11 +25,11 @@ Major architectural restructuring and codebase hardening. Transformed an unorgan
   - `04_simple_parquet_external_table.md`: External Parquet tables over GCS; PyArrow-to-BigQuery data type mapping matrix; read-only limitations.
   - `05_mysql_to_iceberg_direct_sql.md`: Educational direct SQL ingestion pattern via JSON UNNEST and 2-tier Medallion MERGE upsert.
 - **Stage 3: DTS to Iceberg (`docs/03_dts_to_iceberg/`)**
-  - `06_dts_parquet_migration.md`: Preserving pipeline consistency via BigQuery Data Transfer Service (DTS) using GCS landing zones; PyArrow microsecond timestamp precision.
-  - `07_dts_parquet_airflow_orchestration.md`: Orchestrating DTS via Airflow API; Iceberg snapshot retention; automated BigLake Garbage Collection lifecycle.
+  - `06_dts_parquet_migration.md`: Preserving pipeline consistency via BigQuery Data Transfer Service (DTS) using GCS landing zones; introduces **Scenario A (Post-Ingestion File Deletion)** vs. **Scenario B (Filename & Prefix Detection Without Deletion)**; PyArrow microsecond timestamp precision.
+  - `07_dts_parquet_airflow_orchestration.md`: Orchestrating DTS via Airflow API; Managing Staging Lifecycles (File Deletion vs. Retention); Iceberg snapshot retention; automated BigLake Garbage Collection lifecycle.
 - **Stage 4: Incremental Loading & Canonical Reference Implementation (`docs/04_incremental_loading/`)**
-  - `08_dts_full_and_incremental_load.md`: Dynamic cold-start detection (target table row count check) to toggle between full extract and incremental delta slices.
-  - `09_reference_pipeline_date_prefix_sensor.md`: **Canonical Reference Implementation** (`transaksi_bank`): date-prefixed folders (`export_YYYYMMDD/`), DTS runtime macros, `BigQueryDataTransferServiceTransferRunSensor`, and partition-pruned `MERGE`.
+  - `08_dts_full_and_incremental_load.md`: **Scenario B in Action**: Dynamic cold-start detection (target table row count check) using distinct filename signatures (`batch_users_full_load.parquet` vs `batch_users_incremental_YYYYMMDD.parquet`) without deleting historical files.
+  - `09_reference_pipeline_date_prefix_sensor.md`: **Canonical Reference Implementation** (`transaksi_bank`): Production embodiment of **Scenario B (Zero File Deletion Archive)** with date-prefixed folders (`export_YYYYMMDD/`), DTS runtime macros, `BigQueryDataTransferServiceTransferRunSensor`, and partition-pruned `MERGE`.
 - **Stage 5: Schema Evolution Workarounds (`docs/05_schema_evolution/`)**
   - `10_automated_schema_evolution_iceberg.md`: Resolving DTS's lack of auto-schema evolution for Iceberg destinations via PyArrow metadata inspection and automated DDL migration.
 
