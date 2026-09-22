@@ -1,74 +1,140 @@
-# MySQL → BigQuery Data Lakehouse: Documentation Index
+# BigLake, Apache Iceberg, and BigQuery Pipeline Playbook
+### Enterprise Lakehouse Architecture, Ingestion Patterns, and Migration Guidance on Google Cloud
 
-This repository is a knowledge base of guides, proof-of-concepts, and production-ready pipeline blueprints for building a **Data Lakehouse on Google Cloud**, migrating data from **MySQL** into **BigQuery**, using **Apache Airflow**, **BigQuery Data Transfer Service (DTS)**, **Google Cloud Storage (GCS)**, and **Apache Iceberg (BigLake Managed Tables)**.
+[![GCP](https://img.shields.io/badge/Google_Cloud-BigQuery_%7C_BigLake_%7C_GCS-4285F4?logo=googlecloud&logoColor=white)](https://cloud.google.com/bigquery)
+[![Apache Iceberg](https://img.shields.io/badge/Table_Format-Apache_Iceberg-008ED4?logo=apache)](https://iceberg.apache.org/)
+[![Apache Airflow](https://img.shields.io/badge/Orchestrator-Apache_Airflow-017CEE?logo=apacheairflow&logoColor=white)](https://airflow.apache.org/)
+[![Architecture](https://img.shields.io/badge/Architecture-Two--Tier_Medallion-blueviolet)]()
 
-Every pipeline in this repo follows the same core architectural pattern:
+---
 
+## 📖 Executive Summary & Playbook Purpose
+
+This repository serves as a **practical demonstration and architectural guidance playbook** for building modern, open Data Lakehouses on **Google Cloud Platform (GCP)**. It integrates **BigQuery**, **BigLake Managed Tables (Apache Iceberg)**, **Cloud Storage (GCS)**, **BigQuery Data Transfer Service (DTS)**, and **Apache Airflow**.
+
+> **Context & Architectural Decisions:**  
+> - **Why DTS?** In many enterprise settings, teams choose BigQuery Data Transfer Service to preserve operational consistency with existing scheduled pipelines. While DTS has specific limitations (such as no direct database extraction and no native auto-schema evolution for Iceberg destinations), this playbook demonstrates how to overcome these limitations by combining lightweight Python extraction, date-partitioned GCS staging, and Airflow API orchestration.
+> - **Demo + Guidance Scope:** The sample data volumes in this repository are intentionally compact and reproducible so engineers can validate concepts quickly in sandbox GCP environments without incurring high compute costs. Certain patterns (e.g. a 2-tier Medallion staging pattern for a few hundred rows) represent enterprise-scale concepts demonstrated through lightweight examples.
+
+---
+
+## 🗺️ Progressive 5-Stage Learning Roadmap
+
+The playbook is structured as a clear progression from foundational lakehouse storage concepts to hardened, production-grade automated pipelines:
+
+```mermaid
+graph LR
+    S1["Stage 1:<br/>Concept & Foundations<br/>(Parquet vs. Hive vs. Iceberg)"] --> S2["Stage 2:<br/>Simple Ingestion<br/>(External Tables & Direct DML)"]
+    S2 --> S3["Stage 3:<br/>DTS to Iceberg<br/>(GCS Staging & DTS Append)"]
+    S3 --> S4["Stage 4:<br/>Incremental Loading<br/>(DTS Sensor & Reference Pipeline)"]
+    S4 --> S5["Stage 5:<br/>Schema Evolution<br/>(PyArrow Drift Detection)"]
 ```
-MySQL (source) → Parquet (in-memory/GCS) → BigLake Iceberg Table (History/Staging Layer)
-              → MERGE / UPSERT → BigQuery Native Table (Main/Serving Layer)
+
+---
+
+## 📚 Documentation Index
+
+| Stage | Section & Topic | Core Concepts | Linked Assets |
+| :---: | :--- | :--- | :--- |
+| **Stage 1** | **[01. Concepts & Architecture](docs/01_concept_why_biglake_and_iceberg/01_biglake_iceberg_concepts.md)** | Comparison of Parquet, Hive Partitioning, and Iceberg metadata layers; ACID transactions; Time travel. | - |
+| **Stage 1** | **[02. Connection & IAM Setup](docs/01_concept_why_biglake_and_iceberg/02_biglake_connection_and_iam.md)** | Cloud Resource Connection creation; IAM delegation; `Storage Object Admin` vs `Storage Object Viewer`. | - |
+| **Stage 1** | **[03. POC: Hive to Managed Iceberg](docs/01_concept_why_biglake_and_iceberg/03_poc_hive_to_managed_iceberg.md)** | Hands-on migration of public NYC Taxi data into Iceberg; testing row-level `UPDATE` and `DELETE`. | [`sql/02_ddl_poc_nyc_taxi_iceberg.sql`](sql/02_ddl_poc_nyc_taxi_iceberg.sql) |
+| **Stage 2** | **[04. Simple Parquet External Tables](docs/02_simple_ingestion/04_simple_parquet_external_table.md)** | Read-only external table mapping over GCS; PyArrow to BigQuery data type mapping matrix; immutability rules. | [`sql/01_ddl_external_parquet.sql`](sql/01_ddl_external_parquet.sql) |
+| **Stage 2** | **[05. Direct SQL MySQL to Iceberg](docs/02_simple_ingestion/05_mysql_to_iceberg_direct_sql.md)** | Educational prototype loading CDC into Iceberg via JSON UNNEST DML; 2-tier Medallion MERGE upsert. | [`sql/03_ddl_mysql_staging_and_native.sql`](sql/03_ddl_mysql_staging_and_native.sql)<br/>[`dags/dag_05_mysql_direct_sql.py`](dags/dag_05_mysql_direct_sql.py) |
+| **Stage 3** | **[06. DTS Parquet Migration](docs/03_dts_to_iceberg/06_dts_parquet_migration.md)** | Overcoming SQL query size limits; GCS landing zone; PyArrow microsecond timestamp precision (`coerce_timestamps='us'`). | - |
+| **Stage 3** | **[07. DTS Airflow Orchestration](docs/03_dts_to_iceberg/07_dts_parquet_airflow_orchestration.md)** | Airflow triggering DTS via API; Iceberg snapshots, Time Travel retention, and automated BigLake Garbage Collection. | [`dags/dag_07_dts_parquet_to_iceberg.py`](dags/dag_07_dts_parquet_to_iceberg.py) |
+| **Stage 4** | **[08. Full & Incremental Loading](docs/04_incremental_loading/08_dts_full_and_incremental_load.md)** | Dynamic cold-start detection (target row count check); toggling between initial full extract and daily incremental slices. | [`dags/dag_08_dts_full_and_incremental.py`](dags/dag_08_dts_full_and_incremental.py) |
+| **Stage 4** | **[09. Canonical Reference Pipeline](docs/04_incremental_loading/09_reference_pipeline_date_prefix_sensor.md)** | **Canonical Reference Implementation**: Date-prefixed folders (`export_YYYYMMDD/`); DTS macro; DTS Sensor; partition-pruned MERGE. | [`sql/04_ddl_reference_staging_and_native.sql`](sql/04_ddl_reference_staging_and_native.sql)<br/>[`sql/05_merge_staging_to_native.sql`](sql/05_merge_staging_to_native.sql)<br/>[`dags/dag_09_reference_pipeline_date_prefix.py`](dags/dag_09_reference_pipeline_date_prefix.py) |
+| **Stage 5** | **[10. Automated Schema Evolution](docs/05_schema_evolution/10_automated_schema_evolution_iceberg.md)** | Resolving DTS lack of auto-schema evolution on Iceberg; PyArrow metadata drift detection; automated `ALTER TABLE` DDL. | [`scripts/simulate_mysql_producer.py`](scripts/simulate_mysql_producer.py)<br/>[`dags/dag_10_schema_evolution_iceberg.py`](dags/dag_10_schema_evolution_iceberg.py) |
+
+---
+
+## 🗂️ Repository Structure
+
+```text
+biglake-iceberg-bq/
+├── README.md                                          # Master playbook index and architecture portal
+├── docs/                                              # 5-stage progressive documentation
+│   ├── 01_concept_why_biglake_and_iceberg/
+│   │   ├── 01_biglake_iceberg_concepts.md             # Parquet vs Hive vs Iceberg fundamentals
+│   │   ├── 02_biglake_connection_and_iam.md           # BigLake connection setup & IAM delegation
+│   │   └── 03_poc_hive_to_managed_iceberg.md          # Public NYC Taxi POC
+│   ├── 02_simple_ingestion/
+│   │   ├── 04_simple_parquet_external_table.md        # External Parquet tables & type mappings
+│   │   └── 05_mysql_to_iceberg_direct_sql.md          # MySQL direct SQL insertion prototype
+│   ├── 03_dts_to_iceberg/
+│   │   ├── 06_dts_parquet_migration.md                # GCS staging & BigQuery DTS setup
+│   │   └── 07_dts_parquet_airflow_orchestration.md    # Airflow DTS orchestration & GC lifecycle
+│   ├── 04_incremental_loading/
+│   │   ├── 08_dts_full_and_incremental_load.md        # Dynamic full vs delta batch switching
+│   │   └── 09_reference_pipeline_date_prefix_sensor.md# CANONICAL REFERENCE PIPELINE with sensor
+│   └── 05_schema_evolution/
+│       └── 10_automated_schema_evolution_iceberg.md   # PyArrow schema drift detection workaround
+├── dags/                                              # Standalone Apache Airflow DAGs
+│   ├── dag_05_mysql_direct_sql.py                     # Stage 2: MySQL to Iceberg via JSON UNNEST
+│   ├── dag_07_dts_parquet_to_iceberg.py               # Stage 3: Orchestrating DTS & Scheduled Query
+│   ├── dag_08_dts_full_and_incremental.py             # Stage 4: Dynamic cold-start & delta extract
+│   ├── dag_09_reference_pipeline_date_prefix.py       # Stage 4: Hardened canonical pipeline with DTS sensor
+│   └── dag_10_schema_evolution_iceberg.py             # Stage 5: Schema drift detection & ALTER TABLE DDL
+├── sql/                                               # Standalone BigQuery SQL DDL and DML scripts
+│   ├── 01_ddl_external_parquet.sql                    # External Parquet table creation & CTAS
+│   ├── 02_ddl_poc_nyc_taxi_iceberg.sql                # NYC Taxi external and managed Iceberg DDL/DML
+│   ├── 03_ddl_mysql_staging_and_native.sql            # Stage 2 user migration staging & serving DDL
+│   ├── 04_ddl_reference_staging_and_native.sql        # Stage 4 banking reference DDL
+│   └── 05_merge_staging_to_native.sql                 # Partition-pruned templated BigQuery MERGE
+└── scripts/                                           # Simulation and testing utility scripts
+    └── simulate_mysql_producer.py                     # Schema drift simulation (Day 1 vs Day 2 columns)
 ```
 
-## Repository Structure
+---
 
+## ⚡ Quickstart & Deployment Cheat Sheet
+
+### 1. Prerequisites Check
+Before running any DAGs:
+1. Ensure your BigLake Cloud Resource connection is provisioned:
+   ```bash
+   bq mk --connection --location=asia-southeast2 \
+     --connection_type=CLOUD_RESOURCE biglake-data-connection
+   ```
+2. Retrieve the connection's Service Account and grant it **Storage Object Admin** (`roles/storage.objectAdmin`) on your target GCS bucket.
+3. Grant your Airflow execution identity **BigQuery Connection User** (`roles/bigquery.connectionUser`) on the connection.
+
+### 2. Run the Canonical Reference Pipeline (Stage 4)
+For a complete demonstration of enterprise lakehouse ingestion:
+1. Run [`sql/04_ddl_reference_staging_and_native.sql`](sql/04_ddl_reference_staging_and_native.sql) in BigQuery Studio.
+2. Create an On-demand DTS transfer with URI:
+   `gs://<YOUR_BUCKET>/data_transaksi/export_{run_time+7h|"%Y%m%d"}/*.parquet`
+3. Update connection and resource IDs in [`dags/dag_09_reference_pipeline_date_prefix.py`](dags/dag_09_reference_pipeline_date_prefix.py) and deploy to Airflow.
+4. Trigger the DAG in Airflow UI. The pipeline will:
+   - Generate test transaction records in MySQL.
+   - Detect that the destination table is empty and execute an initial extract.
+   - Coerce timestamps to UTC microsecond precision.
+   - Stage Parquet files in date-prefixed folders.
+   - Trigger BigQuery DTS and poll using `BigQueryDataTransferServiceTransferRunSensor`.
+   - Merge records into `final_transaksi` with partition pruning and soft-delete handling.
+
+### 3. Test Automated Schema Evolution (Stage 5)
+To observe dynamic schema synchronization:
+```bash
+# Day 1: Baseline upload
+python scripts/simulate_mysql_producer.py --day 1 --bucket <YOUR_BUCKET> --prefix staging/
+
+# Day 2: Schema drift (introduces new columns)
+python scripts/simulate_mysql_producer.py --day 2 --bucket <YOUR_BUCKET> --prefix staging/
+
+# Trigger dag_10_schema_evolution_iceberg in Airflow UI to alter table schema and ingest via DTS
 ```
-.
-├── README.md          ← you are here (index)
-├── docs/              ← architecture guides, comparisons, and pipeline write-ups
-└── code/              ← runnable Airflow DAGs and standalone test/helper scripts
-```
-
-- **`docs/`** explains the *why* and *how* — architecture decisions, DDL, setup steps, troubleshooting.
-- **`code/`** contains the *actual* Python/Airflow implementations referenced by some of the docs below.
-- Not every doc has a corresponding code file (some only contain inline SQL/DDL snippets); the mapping table in each section below tells you which ones do.
 
 ---
 
-## 1. Foundations & Core Concepts
+## 🛡️ Best Practices & Enterprise Hardening Rules
 
-Read these first to understand the building blocks used across every pipeline in this repo.
-
-| Doc | Code | What it covers |
-| --- | --- | --- |
-| [`docs/biglake-connection-setup.md`](./docs/biglake-connection-setup.md) | — | Step-by-step guide to creating a **BigLake Connection** (Cloud Resource) in BigQuery, granting the connection's service account IAM access (`Storage Object Viewer`) on GCS, and troubleshooting the two most common setup errors. |
-| [`docs/BQ-Managed-Table.md`](./docs/BQ-Managed-Table.md) | — | Conceptual deep-dive comparing **Apache Parquet**, **Hive Partitioning**, and **Apache Iceberg** — pros, cons, and a comparison table covering DML support, ACID transactions, time travel, and schema evolution. |
-| [`docs/Parquet-data.md`](./docs/Parquet-data.md) | — | How to create **BigLake external tables** over raw Parquet, a SQL Server → BigQuery type mapping matrix, a CRUD capability matrix across storage formats, and troubleshooting "matched no files" errors. |
-
----
-
-## 2. Proof of Concept / Testing
-
-| Doc | Code | What it covers |
-| --- | --- | --- |
-| [`docs/BQ-Managed-Table-Test.md`](./docs/BQ-Managed-Table-Test.md) | — | Hands-on POC using the public **NYC Taxi dataset**: copying Hive-partitioned Parquet into your own bucket, creating an external staging table, materializing it into a **BigLake Managed Iceberg Table**, and validating native `SELECT`, `UPDATE`, `DELETE`. |
-
----
-
-## 3. Migration Pipeline Blueprints (MySQL → BigQuery)
-
-| Doc | Code | Pipeline style / key differentiator |
-| --- | --- | --- |
-| [`docs/MySql_To_BQ_Managed_Table.md`](./docs/MySql_To_BQ_Managed_Table.md) | — | One-time/CDC migration. Loads directly into Iceberg via `INSERT ... UNNEST(JSON_QUERY_ARRAY())` (no DTS/GCS hop). Includes full MySQL → BigQuery type mapping. |
-| [`docs/dts_parquet_migration_docs.md`](./docs/dts_parquet_migration_docs.md) | — | CDC (24h window). Airflow → in-memory Parquet → GCS → DTS ingests into Iceberg → Scheduled Query `MERGE`s into Native table. |
-| [`docs/dts_parquet_to-iceberg.md`](./docs/dts_parquet_to-iceberg.md) | — | Full + Incremental batch. Airflow checks if the target table is empty to decide Full vs. Incremental Load, then hands off to DTS + scheduled `MERGE`. |
-| [`docs/dts_parquet_to_iceberg_with_airflow.md`](./docs/dts_parquet_to_iceberg_with_airflow.md) | [`code/dts_airflow_orchestrator.py`](./code/dts_airflow_orchestrator.py) | Unified, Airflow-triggered pipeline (no BigQuery-side cron). The code version extends the doc's concept with dummy-data generation, pre/post row-count + GCS-size metrics, an oldest-row cleanup step, and an emailed run report. |
-| [`docs/dts_to_bq_managed_table_with_date_prefix.md`](./docs/dts_to_bq_managed_table_with_date_prefix.md) | [`code/airflow_test_data_transaksi.py`](./code/airflow_test_data_transaksi.py) | Date-prefixed folders, soft-delete banking example (`transaksi_bank`). Strict PyArrow schema enforcement, DTS sensor to wait for completion, dummy-data generator (700 insert / 200 update / 100 soft-delete). |
-
----
-
-## 4. Automation & Schema Management
-
-| Doc | Code | What it covers |
-| --- | --- | --- |
-| [`docs/automated-schema-evolution-gcs-bigquery-iceberg.md`](./docs/automated-schema-evolution-gcs-bigquery-iceberg.md) | [`code/airflow_test_add_delete_column.py`](./code/airflow_test_add_delete_column.py) · [`code/test-delete-add-tcolumn.py`](./code/test-delete-add-tcolumn.py) | Solves the gap where DTS doesn't support `ALLOW_FIELD_ADDITION` on Iceberg tables. The DAG (`airflow_test_add_delete_column.py`) inspects incoming Parquet metadata, diffs it against the BigQuery schema, and runs `ALTER TABLE ... ADD COLUMN` automatically before triggering DTS. `test-delete-add-tcolumn.py` is the companion script that uploads a test Parquet file with new columns to trigger the evolution. |
-
----
-
-## How to Navigate This Repo
-
-- **New to the lakehouse pattern?** Start with Section 1 (`docs/` foundations).
-- **Want to see it work end-to-end first?** Try Section 2's NYC Taxi POC.
-- **Building a real pipeline?** Pick the blueprint in Section 3 that matches your load pattern, then open its matching file in `code/` if one exists.
-- **Hitting schema drift issues?** Jump to Section 4 — doc + code both included.
-
-All `<placeholder>` / `[YOUR_...]` values in the SQL and Python snippets must be replaced with your actual GCP project ID, dataset, bucket names, and connection IDs before running.
+1. **Storage Role for BigLake Managed Tables:**  
+   Always grant `roles/storage.objectAdmin` (not just `objectViewer`) to the BigLake connection SA, as BigQuery must write manifests and delete expired files.
+2. **PyArrow Timestamp Precision:**  
+   Always export Parquet files with `coerce_timestamps='us'` and UTC timezone. BigQuery rejects nanosecond timestamps (`TIMESTAMP_NANOS`) during load operations.
+3. **Eliminate DTS Race Conditions:**  
+   Because `BigQueryDataTransferServiceStartTransferRunsOperator` returns asynchronously, always pair it with `BigQueryDataTransferServiceTransferRunSensor` before triggering downstream MERGE operations.
+4. **Partition Pruning on MERGE Queries:**  
+   Always include the target table's partition column in the `ON` condition (e.g. `AND T.tanggal_transaksi = S.tanggal_transaksi`) to prevent BigQuery from performing expensive full-table scans.
