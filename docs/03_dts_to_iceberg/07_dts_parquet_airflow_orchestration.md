@@ -1,8 +1,14 @@
 # Stage 3: Using DTS to Ingest into Iceberg
-## Part 3.2: Airflow Orchestration with BigQuery DTS & Iceberg Storage Lifecycle
+## Part 3.2: Airflow Orchestration with BigQuery DTS: Managing Staging Lifecycles (File Deletion vs. Retention) & Iceberg Storage
 
-> **Section Overview:**  
-> This section brings together Apache Airflow, BigQuery Data Transfer Service (DTS), and BigLake Managed Tables. It demonstrates how Airflow orchestrates extraction from MySQL into GCS, triggers DTS on-demand via API, and runs a downstream scheduled query to merge changes. It also details Iceberg snapshot mechanics, Time Travel, and automated Google Cloud Garbage Collection.
+> **Section Overview & Orchestration Scenarios:**  
+> This section brings together Apache Airflow, BigQuery Data Transfer Service (DTS), and BigLake Managed Tables. It demonstrates how Airflow coordinates data extraction from MySQL into GCS, triggers DTS on-demand via API, and manages downstream data consolidation into BigQuery native tables.
+>
+> In production Airflow pipelines, managing the intermediary GCS staging layer hinges on two distinct operational approaches:
+> * **Scenario A (Post-Ingestion GCS File Deletion):** Airflow uploads Parquet batches to a temporary GCS prefix (`gs://bucket/landing_zone/*.parquet`), triggers DTS, and upon transfer completion executes an optional cleanup task (or relies on DTS's automatic deletion flag) to purge processed objects. This maintains an ephemeral landing zone with zero residual storage footprint.
+> * **Scenario B (Filename & Prefix Detection Without Deletion):** Airflow uploads batches into structured, timestamped or date-prefixed GCS paths (e.g., `gs://bucket/landing_zone/export_YYYYMMDD/*.parquet`). Instead of deleting files, the orchestrator configures DTS to target the exact execution window's prefix. Historical files remain completely intact in GCS as an immutable lakehouse audit trail, and duplicate ingestion is prevented strictly by prefix/filename scoping.
+>
+> This guide demonstrates the baseline orchestration flow, explains Iceberg snapshot mechanics and Time Travel, and explores automated Google Cloud Garbage Collection.
 
 ---
 
@@ -18,6 +24,7 @@ graph TD
     subgraph Airflow [Apache Airflow Orchestrator - Central Controller]
         direction LR
         T1[Task 1: Extract & Upload] --> T2[Task 2: Trigger DTS Ingestion] --> T3[Task 3: Trigger Merge]
+        T2 -.->|Optional in Scenario A| T4[Task 4: Purge Staged GCS Files]
     end
 
     subgraph Data_Pipeline [Data Flow Layer]

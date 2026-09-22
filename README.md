@@ -13,8 +13,11 @@
 This repository serves as a **practical demonstration and architectural guidance playbook** for building modern, open Data Lakehouses on **Google Cloud Platform (GCP)**. It integrates **BigQuery**, **BigLake Managed Tables (Apache Iceberg)**, **Cloud Storage (GCS)**, **BigQuery Data Transfer Service (DTS)**, and **Apache Airflow**.
 
 > **Context & Architectural Decisions:**  
-> - **Why DTS?** In many enterprise settings, teams choose BigQuery Data Transfer Service to preserve operational consistency with existing scheduled pipelines. While DTS has specific limitations (such as no direct database extraction and no native auto-schema evolution for Iceberg destinations), this playbook demonstrates how to overcome these limitations by combining lightweight Python extraction, date-partitioned GCS staging, and Airflow API orchestration.
-> - **Demo + Guidance Scope:** The sample data volumes in this repository are intentionally compact and reproducible so engineers can validate concepts quickly in sandbox GCP environments without incurring high compute costs. Certain patterns (e.g. a 2-tier Medallion staging pattern for a few hundred rows) represent enterprise-scale concepts demonstrated through lightweight examples.
+> - **Why DTS?** In many enterprise settings, teams choose BigQuery Data Transfer Service to preserve operational consistency with existing scheduled pipelines. While DTS has specific limitations (such as no direct database extraction and no native auto-schema evolution for Iceberg destinations), this playbook demonstrates how to overcome these limitations by combining lightweight Python extraction, GCS staging, and Airflow API orchestration.
+> - **GCS Staging Lifecycle Scenarios:** When staging Parquet files for DTS ingestion, two architectural strategies are contrasted:
+>   1. **Scenario A (Post-Ingestion File Deletion):** Ephemeral staging where processed Parquet files are automatically deleted after DTS completes, keeping the landing bucket clean.
+>   2. **Scenario B (Filename & Prefix Detection Without Deletion):** Immutable staging where files are permanently retained in GCS (e.g. `export_YYYYMMDD/` or dynamic filenames) for auditability and replay, using prefix/filename detection to prevent duplicate ingestion.
+> - **Demo + Guidance Scope:** The sample data volumes in this repository are intentionally compact and reproducible so engineers can validate concepts quickly in sandbox GCP environments without incurring high compute costs.
 
 ---
 
@@ -25,8 +28,8 @@ The playbook is structured as a clear progression from foundational lakehouse st
 ```mermaid
 graph LR
     S1["Stage 1:<br/>Concept & Foundations<br/>(Parquet vs. Hive vs. Iceberg)"] --> S2["Stage 2:<br/>Simple Ingestion<br/>(External Tables & Direct DML)"]
-    S2 --> S3["Stage 3:<br/>DTS to Iceberg<br/>(GCS Staging & DTS Append)"]
-    S3 --> S4["Stage 4:<br/>Incremental Loading<br/>(DTS Sensor & Reference Pipeline)"]
+    S2 --> S3["Stage 3:<br/>DTS to Iceberg<br/>(GCS Staging: Deletion vs. Detection)"]
+    S3 --> S4["Stage 4:<br/>Incremental Loading<br/>(Date Prefixes & DTS Sensor)"]
     S4 --> S5["Stage 5:<br/>Schema Evolution<br/>(PyArrow Drift Detection)"]
 ```
 
@@ -38,13 +41,13 @@ graph LR
 | :---: | :--- | :--- | :--- |
 | **Stage 1** | **[01. Concepts & Architecture](docs/01_concept_why_biglake_and_iceberg/01_biglake_iceberg_concepts.md)** | Comparison of Parquet, Hive Partitioning, and Iceberg metadata layers; ACID transactions; Time travel. | - |
 | **Stage 1** | **[02. Connection & IAM Setup](docs/01_concept_why_biglake_and_iceberg/02_biglake_connection_and_iam.md)** | Cloud Resource Connection creation; IAM delegation; `Storage Object Admin` vs `Storage Object Viewer`. | - |
-| **Stage 1** | **[03. POC: Hive to Managed Iceberg](docs/01_concept_why_biglake_and_iceberg/03_poc_hive_to_managed_iceberg.md)** | Hands-on migration of public NYC Taxi data into Iceberg; testing row-level `UPDATE` and `DELETE`. | [`sql/02_ddl_poc_nyc_taxi_iceberg.sql`](sql/02_ddl_poc_nyc_taxi_iceberg.sql) |
-| **Stage 2** | **[04. Simple Parquet External Tables](docs/02_simple_ingestion/04_simple_parquet_external_table.md)** | Read-only external table mapping over GCS; PyArrow to BigQuery data type mapping matrix; immutability rules. | [`sql/01_ddl_external_parquet.sql`](sql/01_ddl_external_parquet.sql) |
-| **Stage 2** | **[05. Direct SQL MySQL to Iceberg](docs/02_simple_ingestion/05_mysql_to_iceberg_direct_sql.md)** | Educational prototype loading CDC into Iceberg via JSON UNNEST DML; 2-tier Medallion MERGE upsert. | [`sql/03_ddl_mysql_staging_and_native.sql`](sql/03_ddl_mysql_staging_and_native.sql)<br/>[`dags/dag_05_mysql_direct_sql.py`](dags/dag_05_mysql_direct_sql.py) |
-| **Stage 3** | **[06. DTS Parquet Migration](docs/03_dts_to_iceberg/06_dts_parquet_migration.md)** | Overcoming SQL query size limits; GCS landing zone; PyArrow microsecond timestamp precision (`coerce_timestamps='us'`). | - |
-| **Stage 3** | **[07. DTS Airflow Orchestration](docs/03_dts_to_iceberg/07_dts_parquet_airflow_orchestration.md)** | Airflow triggering DTS via API; Iceberg snapshots, Time Travel retention, and automated BigLake Garbage Collection. | [`dags/dag_07_dts_parquet_to_iceberg.py`](dags/dag_07_dts_parquet_to_iceberg.py) |
-| **Stage 4** | **[08. Full & Incremental Loading](docs/04_incremental_loading/08_dts_full_and_incremental_load.md)** | Dynamic cold-start detection (target row count check); toggling between initial full extract and daily incremental slices. | [`dags/dag_08_dts_full_and_incremental.py`](dags/dag_08_dts_full_and_incremental.py) |
-| **Stage 4** | **[09. Canonical Reference Pipeline](docs/04_incremental_loading/09_reference_pipeline_date_prefix_sensor.md)** | **Canonical Reference Implementation**: Date-prefixed folders (`export_YYYYMMDD/`); DTS macro; DTS Sensor; partition-pruned MERGE. | [`sql/04_ddl_reference_staging_and_native.sql`](sql/04_ddl_reference_staging_and_native.sql)<br/>[`sql/05_merge_staging_to_native.sql`](sql/05_merge_staging_to_native.sql)<br/>[`dags/dag_09_reference_pipeline_date_prefix.py`](dags/dag_09_reference_pipeline_date_prefix.py) |
+| **Stage 1** | **[03. Migration: Hive to Managed Iceberg](docs/01_concept_why_biglake_and_iceberg/03_poc_hive_to_managed_iceberg.md)** | Hands-on migration of public NYC Taxi data into Iceberg; testing row-level `UPDATE` and `DELETE`. | [`sql/02_ddl_poc_nyc_taxi_iceberg.sql`](sql/02_ddl_poc_nyc_taxi_iceberg.sql) |
+| **Stage 2** | **[04. Simple Parquet External Tables](docs/02_simple_ingestion/04_simple_parquet_external_table.md)** | Read-only external table (not iceberg) mapping over GCS; PyArrow to BigQuery data type mapping matrix; immutability rules. | [`sql/01_ddl_external_parquet.sql`](sql/01_ddl_external_parquet.sql) |
+| **Stage 2** | **[05. Direct SQL MySQL to Iceberg](docs/02_simple_ingestion/05_mysql_to_iceberg_direct_sql.md)** | simple loading CDC into Iceberg via JSON UNNEST DML; 2-tier Medallion MERGE upsert. | [`sql/03_ddl_mysql_staging_and_native.sql`](sql/03_ddl_mysql_staging_and_native.sql)<br/>[`dags/dag_05_mysql_direct_sql.py`](dags/dag_05_mysql_direct_sql.py) |
+| **Stage 3** | **[06. DTS Parquet Staging & Migration](docs/03_dts_to_iceberg/06_dts_parquet_migration.md)** | GCS Staging Strategies: **Scenario A** (Post-Ingestion Deletion) vs. **Scenario B** (Filename Detection); timestamp precision (`coerce_timestamps='us'`). | - |
+| **Stage 3** | **[07. DTS Airflow Orchestration & Lifecycles](docs/03_dts_to_iceberg/07_dts_parquet_airflow_orchestration.md)** | Airflow triggering DTS via API; Managing GCS Staging Lifecycles (Deletion vs. Retention); Iceberg snapshots and Garbage Collection. | [`dags/dag_07_dts_parquet_to_iceberg.py`](dags/dag_07_dts_parquet_to_iceberg.py) |
+| **Stage 4** | **[08. Dynamic Filename Detection Batching](docs/04_incremental_loading/08_dts_full_and_incremental_load.md)** | **Scenario B in Action**: Dynamic Filename Detection for cold starts (`full_load.parquet`) vs daily deltas (`incremental_YYYYMMDD.parquet`) without deleting historical files. | [`dags/dag_08_dts_full_and_incremental.py`](dags/dag_08_dts_full_and_incremental.py) |
+| **Stage 4** | **[09. Canonical Date-Prefix Reference Pipeline](docs/04_incremental_loading/09_reference_pipeline_date_prefix_sensor.md)** | **Canonical Reference Implementation**: Immutable Date-Prefix Detection (`export_YYYYMMDD/`) with Zero File Deletion; DTS Sensor; partition-pruned MERGE. | [`sql/04_ddl_reference_staging_and_native.sql`](sql/04_ddl_reference_staging_and_native.sql)<br/>[`sql/05_merge_staging_to_native.sql`](sql/05_merge_staging_to_native.sql)<br/>[`dags/dag_09_reference_pipeline_date_prefix.py`](dags/dag_09_reference_pipeline_date_prefix.py) |
 | **Stage 5** | **[10. Automated Schema Evolution](docs/05_schema_evolution/10_automated_schema_evolution_iceberg.md)** | Resolving DTS lack of auto-schema evolution on Iceberg; PyArrow metadata drift detection; automated `ALTER TABLE` DDL. | [`scripts/simulate_mysql_producer.py`](scripts/simulate_mysql_producer.py)<br/>[`dags/dag_10_schema_evolution_iceberg.py`](dags/dag_10_schema_evolution_iceberg.py) |
 
 ---
@@ -64,18 +67,18 @@ biglake-iceberg-bq/
 │   │   ├── 04_simple_parquet_external_table.md        # External Parquet tables & type mappings
 │   │   └── 05_mysql_to_iceberg_direct_sql.md          # MySQL direct SQL insertion prototype
 │   ├── 03_dts_to_iceberg/
-│   │   ├── 06_dts_parquet_migration.md                # GCS staging & BigQuery DTS setup
-│   │   └── 07_dts_parquet_airflow_orchestration.md    # Airflow DTS orchestration & GC lifecycle
+│   │   ├── 06_dts_parquet_migration.md                # GCS Staging: Post-Ingestion Deletion vs. Filename Detection
+│   │   └── 07_dts_parquet_airflow_orchestration.md    # Airflow DTS orchestration & Staging Lifecycle
 │   ├── 04_incremental_loading/
-│   │   ├── 08_dts_full_and_incremental_load.md        # Dynamic full vs delta batch switching
-│   │   └── 09_reference_pipeline_date_prefix_sensor.md# CANONICAL REFERENCE PIPELINE with sensor
+│   │   ├── 08_dts_full_and_incremental_load.md        # Dynamic Filename Detection (Full vs. Incremental)
+│   │   └── 09_reference_pipeline_date_prefix_sensor.md# Canonical Reference: Immutable Date-Prefix Detection
 │   └── 05_schema_evolution/
 │       └── 10_automated_schema_evolution_iceberg.md   # PyArrow schema drift detection workaround
 ├── dags/                                              # Standalone Apache Airflow DAGs
 │   ├── dag_05_mysql_direct_sql.py                     # Stage 2: MySQL to Iceberg via JSON UNNEST
-│   ├── dag_07_dts_parquet_to_iceberg.py               # Stage 3: Orchestrating DTS & Scheduled Query
-│   ├── dag_08_dts_full_and_incremental.py             # Stage 4: Dynamic cold-start & delta extract
-│   ├── dag_09_reference_pipeline_date_prefix.py       # Stage 4: Hardened canonical pipeline with DTS sensor
+│   ├── dag_07_dts_parquet_to_iceberg.py               # Stage 3: Orchestrating DTS & Staging Options
+│   ├── dag_08_dts_full_and_incremental.py             # Stage 4: Dynamic cold-start via Filename Detection
+│   ├── dag_09_reference_pipeline_date_prefix.py       # Stage 4: Canonical Immutable Date-Prefix & DTS Sensor
 │   └── dag_10_schema_evolution_iceberg.py             # Stage 5: Schema drift detection & ALTER TABLE DDL
 ├── sql/                                               # Standalone BigQuery SQL DDL and DML scripts
 │   ├── 01_ddl_external_parquet.sql                    # External Parquet table creation & CTAS
