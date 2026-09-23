@@ -87,6 +87,18 @@ PARTITION BY DATE(created_at)
 CLUSTER BY id_transaksi;
 ```
 
+### 2.3. MySQL Table Creation
+```SQL
+CREATE TABLE IF NOT EXISTS final_transaksi (
+    id_transaksi VARCHAR(50) PRIMARY KEY,
+    jumlah DOUBLE, 
+    status VARCHAR(50),
+    tanggal_transaksi DATE,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    deleted_at DATETIME NULL
+);
+```
 ---
 
 ## 3. BigQuery DTS Configuration with Timezone Macro

@@ -55,3 +55,14 @@ CREATE OR REPLACE TABLE `{project_id}.{dataset_id}.final_transaksi`
 )
 PARTITION BY DATE(tanggal_transaksi)
 CLUSTER BY status, id_transaksi;
+
+-- Step 3 : Create Source Table
+CREATE TABLE IF NOT EXISTS final_transaksi (
+    id_transaksi VARCHAR(50) PRIMARY KEY,
+    jumlah DOUBLE, -- Bisa diganti DECIMAL(15,2) jika ini nilai uang yang butuh presisi pasti
+    status VARCHAR(50),
+    tanggal_transaksi DATE,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    deleted_at DATETIME NULL
+);
