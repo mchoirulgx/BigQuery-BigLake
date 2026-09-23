@@ -57,7 +57,7 @@ PARTITION BY DATE(tanggal_transaksi)
 CLUSTER BY status, id_transaksi;
 
 -- Step 3 : Create Source Table
-CREATE TABLE IF NOT EXISTS final_transaksi (
+CREATE TABLE IF NOT EXISTS transaksi_bank (
     id_transaksi VARCHAR(50) PRIMARY KEY,
     jumlah DOUBLE, -- Bisa diganti DECIMAL(15,2) jika ini nilai uang yang butuh presisi pasti
     status VARCHAR(50),
