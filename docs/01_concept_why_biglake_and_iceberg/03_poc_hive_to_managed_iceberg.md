@@ -5,8 +5,8 @@
 > This hands-on POC demonstrates migrating raw, unmanaged Hive-partitioned Parquet data from Google Cloud Storage into a fully transactional **BigLake Managed Table** in BigQuery, utilizing the **Apache Iceberg** table format. You will verify ACID DML capabilities (`UPDATE`, `DELETE`, `SELECT`) directly in GCS without standing up a Spark cluster.
 >
 > Intendend scenario:
-> You have existing data in Hive structure, and wanted to migrate to BigQuery as soon as possible without ingesting into BigQuery's native table.
-> You have existing data in relational DBs or CSV, and wanted to migrate to BigQuery as modern Lakehouse instead of native table.
+> - You have existing data in Hive structure, and wanted to migrate to BigQuery as soon as possible without ingesting into BigQuery's native table.
+> - You have existing data in relational DBs or CSV, and wanted to migrate to BigQuery as modern Lakehouse instead of native table.
 
 ---
 
