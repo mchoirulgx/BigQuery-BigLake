@@ -13,7 +13,7 @@
 
 ## Step 1: Data Type Mapping (Source to BigQuery)
 
-When exporting relational data (such as from SQL Server or MySQL) into Parquet using PyArrow, data types are mapped into BigQuery types [1](https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#parquet_conversions):
+When exporting relational data (such as from SQL Server or MySQL) into Parquet using PyArrow, data types are mapped into BigQuery types <a href="https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#parquet_conversions" target="_blank">[1]</a>:
 
 | Source System Type | Parquet Logical Type (PyArrow) | Destination (BigQuery) | Technical Notes |
 | :--- | :--- | :--- | :--- |
@@ -27,7 +27,7 @@ When exporting relational data (such as from SQL Server or MySQL) into Parquet u
 
 ## Step 2: External Table Creation DDL
 
-Run the following SQL in BigQuery Studio to map your GCS Parquet path to BigQuery using the BigLake Cloud Resource connection [2](https://cloud.google.com/bigquery/docs/create-cloud-storage-table-biglake):
+Run the following SQL in BigQuery Studio to map your GCS Parquet path to BigQuery using the BigLake Cloud Resource connection <a href="https://cloud.google.com/bigquery/docs/create-cloud-storage-table-biglake" target="_blank">[2]</a>:
 
 ```sql
 CREATE OR REPLACE EXTERNAL TABLE `<YOUR_PROJECT_ID>.<YOUR_DATASET>.parquet_data`
@@ -45,7 +45,7 @@ OPTIONS (
 
 ## Step 3: Immutability and CRUD Limitations
 
-External tables over raw Parquet files are strictly **Read-Only** and do not support DML statements [3](https://cloud.google.com/bigquery/docs/external-tables#limitations):
+External tables over raw Parquet files are strictly **Read-Only** and do not support DML statements <a href="https://cloud.google.com/bigquery/docs/external-tables#limitations" target="_blank">[3]</a>:
 
 | Storage Format | Read (SELECT) | Insert (ADD) | Update (MODIFY) | Delete (REMOVE) | Primary Use Case |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -57,7 +57,7 @@ External tables over raw Parquet files are strictly **Read-Only** and do not sup
 
 ## Step 4: Materializing to Native BigQuery for DML
 
-If row-level mutations are needed from an immutable external Parquet table, the data must be materialized into a Native BigQuery table (or an Iceberg table) via CTAS [4](https://cloud.google.com/bigquery/docs/tables#create-table-query) [5](https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax):
+If row-level mutations are needed from an immutable external Parquet table, the data must be materialized into a Native BigQuery table (or an Iceberg table) via CTAS <a href="https://cloud.google.com/bigquery/docs/tables#create-table-query" target="_blank">[4]</a> <a href="https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax" target="_blank">[5]</a>:
 
 ```sql
 -- Materialize into a native table
@@ -96,8 +96,8 @@ To ingest mutable relational data directly from MySQL into a transactional Icebe
 
 ## References
 
-1. [Google Cloud - Parquet type conversions in BigQuery](https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#parquet_conversions)
-2. [Google Cloud - Create a BigLake Cloud Storage table](https://cloud.google.com/bigquery/docs/create-cloud-storage-table-biglake)
-3. [Google Cloud - External table limitations in BigQuery](https://cloud.google.com/bigquery/docs/external-tables#limitations)
-4. [Google Cloud - Create a table from a query result](https://cloud.google.com/bigquery/docs/tables#create-table-query)
-5. [Google Cloud - Data manipulation language (DML) statements](https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax)
+1. <a href="https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#parquet_conversions" target="_blank">Google Cloud - Parquet type conversions in BigQuery</a>
+2. <a href="https://cloud.google.com/bigquery/docs/create-cloud-storage-table-biglake" target="_blank">Google Cloud - Create a BigLake Cloud Storage table</a>
+3. <a href="https://cloud.google.com/bigquery/docs/external-tables#limitations" target="_blank">Google Cloud - External table limitations in BigQuery</a>
+4. <a href="https://cloud.google.com/bigquery/docs/tables#create-table-query" target="_blank">Google Cloud - Create a table from a query result</a>
+5. <a href="https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax" target="_blank">Google Cloud - Data manipulation language (DML) statements</a>

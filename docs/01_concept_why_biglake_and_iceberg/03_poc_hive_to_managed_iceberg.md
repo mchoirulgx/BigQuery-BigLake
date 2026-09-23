@@ -39,7 +39,7 @@ gcloud storage rm -r gs://<YOUR_BUCKET_NAME>/poc_raw_data/nyc_taxi/data_file_yea
 ---
 
 ### Step 2: Create the Staging Table (External / Unmanaged)
-Create an External Table bridge so BigQuery can read raw Parquet files and interpret the Hive directory structure as columns (`data_file_year`, `data_file_month`) [1](https://cloud.google.com/bigquery/docs/hive-partitioned-queries-gcs).
+Create an External Table bridge so BigQuery can read raw Parquet files and interpret the Hive directory structure as columns (`data_file_year`, `data_file_month`) <a href="https://cloud.google.com/bigquery/docs/hive-partitioned-queries-gcs" target="_blank">[1]</a>.
 
 *Run in BigQuery Studio:*
 ```sql
@@ -59,7 +59,7 @@ OPTIONS (
 ---
 
 ### Step 3: Materialize into a BigLake Managed Iceberg Table
-Instruct BigQuery to read from the staging table and write an Apache Iceberg table format (data + metadata manifests) to a new, empty GCS destination. BigQuery takes ownership of this location as the table catalog [2](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#create-tables).
+Instruct BigQuery to read from the staging table and write an Apache Iceberg table format (data + metadata manifests) to a new, empty GCS destination. BigQuery takes ownership of this location as the table catalog <a href="https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#create-tables" target="_blank">[2]</a>.
 
 *Run in BigQuery Studio:*
 ```sql
@@ -73,12 +73,12 @@ OPTIONS (
 ) AS 
 SELECT * FROM `<YOUR_PROJECT_ID>.<YOUR_DATASET>.staging_nyc_taxi_raw`;
 ```
-*(Integer range partitioning prunes partition scans during analytics queries) [3](https://cloud.google.com/bigquery/docs/creating-integer-range-partitions).*
+*(Integer range partitioning prunes partition scans during analytics queries) <a href="https://cloud.google.com/bigquery/docs/creating-integer-range-partitions" target="_blank">[3]</a>.*
 
 ---
 
 ### Step 4: Validate ACID DML Capabilities
-Once Step 3 completes, standard SQL CRUD operations can be executed against the Iceberg table. BigQuery will update metadata manifests and generate new Parquet files seamlessly in GCS [4](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#dml).
+Once Step 3 completes, standard SQL CRUD operations can be executed against the Iceberg table. BigQuery will update metadata manifests and generate new Parquet files seamlessly in GCS <a href="https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#dml" target="_blank">[4]</a>.
 
 #### 1. Aggregate Query (Read OLAP):
 ```sql
@@ -94,7 +94,7 @@ ORDER BY total_trips DESC;
 
 #### 2. Row-Level UPDATE:
 ```sql
--- Iceberg allows direct row modification without rewriting untouched partitions [5](https://iceberg.apache.org/spec/#row-level-delete-schemas)
+-- Iceberg allows direct row modification without rewriting untouched partitions <a href="https://iceberg.apache.org/spec/#row-level-delete-schemas" target="_blank">[5]</a>
 UPDATE `<YOUR_PROJECT_ID>.<YOUR_DATASET>.managed_nyc_taxi_iceberg`
 SET passenger_count = 1
 WHERE passenger_count IS NULL 
@@ -103,7 +103,7 @@ WHERE passenger_count IS NULL
 
 #### 3. Row-Level DELETE:
 ```sql
--- Safely purge negative fare errors natively [4](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#dml)
+-- Safely purge negative fare errors natively <a href="https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#dml" target="_blank">[4]</a>
 DELETE FROM `<YOUR_PROJECT_ID>.<YOUR_DATASET>.managed_nyc_taxi_iceberg`
 WHERE total_amount < 0;
 ```
@@ -118,8 +118,8 @@ Now that the BigLake connection is active and IAM permissions are configured, te
 
 ## References
 
-1. [Google Cloud BigQuery: Hive partitioned queries over Cloud Storage](https://cloud.google.com/bigquery/docs/hive-partitioned-queries-gcs)
-2. [Google Cloud BigQuery: Create Apache Iceberg managed tables](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#create-tables)
-3. [Google Cloud BigQuery: Integer range partitioned tables](https://cloud.google.com/bigquery/docs/creating-integer-range-partitions)
-4. [Google Cloud BigQuery: DML operations on BigLake Iceberg tables](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#dml)
-5. [Apache Iceberg: Row-Level Mutations & Position Deletes](https://iceberg.apache.org/spec/#row-level-delete-schemas)
+1. <a href="https://cloud.google.com/bigquery/docs/hive-partitioned-queries-gcs" target="_blank">Google Cloud BigQuery: Hive partitioned queries over Cloud Storage</a>
+2. <a href="https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#create-tables" target="_blank">Google Cloud BigQuery: Create Apache Iceberg managed tables</a>
+3. <a href="https://cloud.google.com/bigquery/docs/creating-integer-range-partitions" target="_blank">Google Cloud BigQuery: Integer range partitioned tables</a>
+4. <a href="https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#dml" target="_blank">Google Cloud BigQuery: DML operations on BigLake Iceberg tables</a>
+5. <a href="https://iceberg.apache.org/spec/#row-level-delete-schemas" target="_blank">Apache Iceberg: Row-Level Mutations & Position Deletes</a>

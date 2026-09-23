@@ -2,13 +2,13 @@
 
 ## Overview
 
-When you run `DELETE` on a BigQuery Iceberg managed table, the affected rows disappear from query results immediately, but the underlying Parquet data files are **not** removed from Cloud Storage right away. BigQuery only writes new metadata marking those rows as logically deleted; the old data files remain on disk so that **time travel** can restore them if needed [1](https://cloud.google.com/bigquery/docs/time-travel).
+When you run `DELETE` on a BigQuery Iceberg managed table, the affected rows disappear from query results immediately, but the underlying Parquet data files are **not** removed from Cloud Storage right away. BigQuery only writes new metadata marking those rows as logically deleted; the old data files remain on disk so that **time travel** can restore them if needed <a href="https://cloud.google.com/bigquery/docs/time-travel" target="_blank">[1]</a>.
 
 This is why you can observe row count decreasing while physical storage size stays flat or even increases for a while — old files are still retained, and new metadata/delete markers are added on top of them.
 
 ## Default Retention: 7-Day Time Travel Window
 
-Every BigQuery dataset has a **time travel window**, which defaults to **7 days** [1](https://cloud.google.com/bigquery/docs/time-travel) [3](https://cloud.google.com/bigquery/docs/datasets). During this window:
+Every BigQuery dataset has a **time travel window**, which defaults to **7 days** <a href="https://cloud.google.com/bigquery/docs/time-travel" target="_blank">[1]</a> <a href="https://cloud.google.com/bigquery/docs/datasets" target="_blank">[3]</a>. During this window:
 
 - Deleted or modified data can be recovered using `FOR SYSTEM_TIME AS OF`.
 - The physical files backing that data remain in the GCS bucket associated with the Iceberg table's `storage_uri`.
@@ -20,13 +20,13 @@ For regular (native) BigQuery tables, once the time travel window ends, there's 
 
 - Data is no longer accessible via normal queries or `FOR SYSTEM_TIME AS OF`.
 - Only Google Cloud Support can recover the data, and only in genuine emergency/disaster-recovery scenarios.
-- Fail-safe **cannot be disabled, shortened, or configured** — it's a fixed safety net on top of whatever time travel window you set [1](https://cloud.google.com/bigquery/docs/time-travel) [4](https://cloud.google.com/bigquery/docs/restore-deleted-tables).
+- Fail-safe **cannot be disabled, shortened, or configured** — it's a fixed safety net on top of whatever time travel window you set <a href="https://cloud.google.com/bigquery/docs/time-travel" target="_blank">[1]</a> <a href="https://cloud.google.com/bigquery/docs/restore-deleted-tables" target="_blank">[4]</a>.
 
 So for a native table, total retention before physical garbage collection = time travel window (2–7 days) + fail-safe (fixed 7 days), i.e. up to 14 days in the worst case.
 
 ### Important Exception: Iceberg Managed Tables Do Not Use Fail-Safe
 
-**Apache Iceberg managed tables (BigLake managed tables) do not support the fail-safe window** [2](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#data-retention). This is a key difference from native BigQuery tables:
+**Apache Iceberg managed tables (BigLake managed tables) do not support the fail-safe window** <a href="https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#data-retention" target="_blank">[2]</a>. This is a key difference from native BigQuery tables:
 
 | Table type | Time travel window | Extra fail-safe | Total retention before GC |
 |---|---|---|---|
@@ -35,13 +35,13 @@ So for a native table, total retention before physical garbage collection = time
 
 For an Iceberg managed table, Google's documentation states:
 
-> "Automatic compaction and clustering are performed on the data files in the bucket. After the expiration of the time travel window, data files are garbage collected." [2](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#data-retention)
+> "Automatic compaction and clustering are performed on the data files in the bucket. After the expiration of the time travel window, data files are garbage collected." <a href="https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#data-retention" target="_blank">[2]</a>
 
 This means garbage collection for an Iceberg managed table happens **right after** the time travel window expires — there is no additional 7-day buffer waiting on top of it.
 
 ## Configuring the Time Travel Window
 
-The time travel window can be set between **2 and 7 days**, in multiples of 24 hours (48, 72, 96, 120, 144, or 168 hours) [1](https://cloud.google.com/bigquery/docs/time-travel) [3](https://cloud.google.com/bigquery/docs/datasets). Lowering it to the minimum shortens how long deleted data's old files stay billable/physically present, which is most impactful under **physical (compressed) storage billing**, since time travel storage is billed at active-storage rates in that model [1](https://cloud.google.com/bigquery/docs/time-travel).
+The time travel window can be set between **2 and 7 days**, in multiples of 24 hours (48, 72, 96, 120, 144, or 168 hours) <a href="https://cloud.google.com/bigquery/docs/time-travel" target="_blank">[1]</a> <a href="https://cloud.google.com/bigquery/docs/datasets" target="_blank">[3]</a>. Lowering it to the minimum shortens how long deleted data's old files stay billable/physically present, which is most impactful under **physical (compressed) storage billing**, since time travel storage is billed at active-storage rates in that model <a href="https://cloud.google.com/bigquery/docs/time-travel" target="_blank">[1]</a>.
 
 **Set it when creating a new dataset:**
 
@@ -85,14 +85,14 @@ No fail-safe stage applies here, unlike a native table which would add 7 more da
 
 ## Exception: Dropping the Entire Table
 
-If you drop the **entire table** (not just rows), the underlying data files are **not** automatically garbage collected once the time travel window passes — this scenario requires separate manual handling, such as deleting the GCS objects directly or applying lifecycle rules on the bucket [1](https://cloud.google.com/bigquery/docs/time-travel) [2](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#data-retention).
+If you drop the **entire table** (not just rows), the underlying data files are **not** automatically garbage collected once the time travel window passes — this scenario requires separate manual handling, such as deleting the GCS objects directly or applying lifecycle rules on the bucket <a href="https://cloud.google.com/bigquery/docs/time-travel" target="_blank">[1]</a> <a href="https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#data-retention" target="_blank">[2]</a>.
 
 ## Verifying Physical Files in GCS
 
 Two limitations to know first:
 
 - `INFORMATION_SCHEMA.TABLE_STORAGE` does **not** include Iceberg managed tables, so you can't check `time_travel_physical_bytes` through that view for these tables.
-- Iceberg managed tables show as **0 bytes** in the BigQuery Console or standard APIs, because the actual data lives in your own GCS bucket, not inside BigQuery's managed storage [2](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#data-retention) [5](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#storage-billing).
+- Iceberg managed tables show as **0 bytes** in the BigQuery Console or standard APIs, because the actual data lives in your own GCS bucket, not inside BigQuery's managed storage <a href="https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#data-retention" target="_blank">[2]</a> <a href="https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#storage-billing" target="_blank">[5]</a>.
 
 To verify retained/duplicated files directly:
 
@@ -130,7 +130,7 @@ Any file present in the bucket but missing from `active_files` is a file still b
 
 ## Billing Note
 
-Automatic compaction and garbage collection for Iceberg managed tables is billed as **Data Compute Units (DCU)**, not as standard BigQuery storage cost [2](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#data-retention) [5](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#storage-billing).
+Automatic compaction and garbage collection for Iceberg managed tables is billed as **Data Compute Units (DCU)**, not as standard BigQuery storage cost <a href="https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#data-retention" target="_blank">[2]</a> <a href="https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#storage-billing" target="_blank">[5]</a>.
 
 ## Key Takeaways
 
@@ -154,8 +154,8 @@ Proceed to **Stage 2: Simple Ingestion**:
 
 ## References
 
-1. [Google Cloud - Data retention with time travel and fail-safe](https://cloud.google.com/bigquery/docs/time-travel)
-2. [Google Cloud - Manage BigLake Iceberg tables (Data Retention & Maintenance)](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#data-retention)
-3. [Google Cloud - Create and manage datasets (Time travel window option)](https://cloud.google.com/bigquery/docs/datasets)
-4. [Google Cloud - Restore deleted tables](https://cloud.google.com/bigquery/docs/restore-deleted-tables)
-5. [Google Cloud - BigLake managed table pricing and storage billing](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#storage-billing)
+1. <a href="https://cloud.google.com/bigquery/docs/time-travel" target="_blank">Google Cloud - Data retention with time travel and fail-safe</a>
+2. <a href="https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#data-retention" target="_blank">Google Cloud - Manage BigLake Iceberg tables (Data Retention & Maintenance)</a>
+3. <a href="https://cloud.google.com/bigquery/docs/datasets" target="_blank">Google Cloud - Create and manage datasets (Time travel window option)</a>
+4. <a href="https://cloud.google.com/bigquery/docs/restore-deleted-tables" target="_blank">Google Cloud - Restore deleted tables</a>
+5. <a href="https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#storage-billing" target="_blank">Google Cloud - BigLake managed table pricing and storage billing</a>
