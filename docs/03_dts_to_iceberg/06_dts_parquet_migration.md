@@ -2,7 +2,7 @@
 ## Part 3.1: GCS Staging Strategies (Post-Ingestion Deletion vs. Filename Detection) & BigQuery DTS Setup
 
 > **Section Overview & Core Staging Strategies:**  
-> In enterprise environments, maintaining consistency with existing data ingestion patterns often makes **BigQuery Data Transfer Service (DTS)** the preferred tool for file ingestion. However, DTS cannot ingest directly from relational databases like MySQL without an intermediary landing zone in Google Cloud Storage (GCS).
+> For some reasons, the simplicity and ease of use often makes **BigQuery Data Transfer Service (DTS)** the preferred tool for ingestion. However, DTS cannot ingest directly from relational databases like MySQL without an intermediary landing zone in Google Cloud Storage (GCS).
 >
 > When designing the GCS staging layer for DTS ingestion, two primary operational scenarios exist:
 > 
