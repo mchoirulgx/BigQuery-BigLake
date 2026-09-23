@@ -14,7 +14,7 @@
 
 ## 1. Architecture: Two-Tier Medallion Pattern
 
-The architecture employs a two-tier approach to balance storage costs, historical auditability, and query performance [^1]:
+The architecture employs a two-tier approach to balance storage costs, historical auditability, and query performance [1](https://cloud.google.com/architecture/datashare-lakehouse):
 1. **History Layer (Bronze / Staging):** Uses **Apache Iceberg (BigLake Managed Table)** backed by Google Cloud Storage (GCS). This layer acts as an append-only staging area for all incremental batch extracts.
 2. **Main Layer (Gold / Production Serving):** Uses **BigQuery Native Tables**. This layer reflects the deduplicated, latest state of the data by merging changes from the History layer and resolving soft deletes.
 
@@ -29,7 +29,7 @@ flowchart LR
 
 ## 2. Data Type Mapping (MySQL to BigQuery)
 
-Data types are mapped from MySQL relational columns into BigQuery standard SQL data types [^2]:
+Data types are mapped from MySQL relational columns into BigQuery standard SQL data types [2](https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types):
 
 | MySQL Data Type | BigQuery Equivalent | Technical Notes |
 | :--- | :--- | :--- |
@@ -62,7 +62,7 @@ CREATE TABLE users (
 ```
 
 ### 3.2. Staging: BigQuery Iceberg Managed Table (History Layer)
-Create the Iceberg managed staging table using BigLake DDL [^3]:
+Create the Iceberg managed staging table using BigLake DDL [3](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#create-tables):
 ```sql
 CREATE OR REPLACE TABLE `<YOUR_PROJECT_ID>.<YOUR_DATASET>.history_users`
 (
@@ -83,7 +83,7 @@ OPTIONS (
 ```
 
 > [!NOTE]
-> **Hidden Partitioning in Iceberg [^4]**: Unlike Hive external tables, you will not see folder paths like `created_at=2026-08-20/` in GCS. Iceberg maintains partition boundaries inside metadata manifests, preventing folder lock-in and allowing schema/partition evolution without table re-writes.
+> **Hidden Partitioning in Iceberg [4](https://iceberg.apache.org/docs/latest/partitioning/)**: Unlike Hive external tables, you will not see folder paths like `created_at=2026-08-20/` in GCS. Iceberg maintains partition boundaries inside metadata manifests, preventing folder lock-in and allowing schema/partition evolution without table re-writes.
 
 ### 3.3. Serving: BigQuery Native Table (Main Layer)
 ```sql
@@ -103,9 +103,9 @@ PARTITION BY DATE(created_at);
 
 ## 4. Ingestion Mechanism: Direct SQL via JSON UNNEST
 
-Standard BigQuery Load APIs (`bq load` or `to_gbq`) do not currently support direct streaming/loading into BigLake Managed Iceberg tables [^3][^5]. Attempting to use the load job API returns a `403 Delegate Permission` or unsupported destination error.
+Standard BigQuery Load APIs (`bq load` or `to_gbq`) do not currently support direct streaming/loading into BigLake Managed Iceberg tables [3](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#create-tables) [5](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#limitations). Attempting to use the load job API returns a `403 Delegate Permission` or unsupported destination error.
 
-As an educational prototype for small demo datasets, this DAG demonstrates loading by serializing DataFrame records into JSON and executing a parameterized BigQuery `INSERT` query using JSON unnesting functions [^7]:
+As an educational prototype for small demo datasets, this DAG demonstrates loading by serializing DataFrame records into JSON and executing a parameterized BigQuery `INSERT` query using JSON unnesting functions [7](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions):
 
 ```sql
 INSERT INTO `<YOUR_PROJECT_ID>.<YOUR_DATASET>.history_users` 
@@ -122,13 +122,13 @@ FROM UNNEST(JSON_QUERY_ARRAY(@json_str, '$')) AS json_row;
 
 > [!WARNING]
 > **Scaling & Production Notice:**  
-> While the JSON UNNEST approach works effectively for demo workloads (< 5,000 rows), BigQuery has a query string and parameter size limit of 1 MB [^6]. For production datasets, data should be written to GCS as Parquet and loaded using **BigQuery Data Transfer Service (DTS)**, which is covered in Stages 3 and 4.
+> While the JSON UNNEST approach works effectively for demo workloads (< 5,000 rows), BigQuery has a query string and parameter size limit of 1 MB [6](https://cloud.google.com/bigquery/quotas#query_jobs). For production datasets, data should be written to GCS as Parquet and loaded using **BigQuery Data Transfer Service (DTS)**, which is covered in Stages 3 and 4.
 
 ---
 
 ## 5. Merging Staging to Native Serving
 
-Once new updates land in `history_users`, an idempotent `MERGE` updates the native serving table, transforming soft-deletes into hard deletes [^8]:
+Once new updates land in `history_users`, an idempotent `MERGE` updates the native serving table, transforming soft-deletes into hard deletes [8](https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#merge_statement):
 
 ```sql
 MERGE `<YOUR_PROJECT_ID>.<YOUR_DATASET>.managed_main_users` T
@@ -165,19 +165,19 @@ WHEN NOT MATCHED AND S.deleted_at IS NULL THEN
 
 ---
 
-## References
-
-[^1]: [Google Cloud Architecture Center - Datashare lakehouse architecture](https://cloud.google.com/architecture/datashare-lakehouse)
-[^2]: [Google Cloud - BigQuery standard SQL data types](https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types)
-[^3]: [Google Cloud - Manage BigLake Iceberg tables (Create tables)](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#create-tables)
-[^4]: [Apache Iceberg - Hidden Partitioning Specification](https://iceberg.apache.org/docs/latest/partitioning/)
-[^5]: [Google Cloud - BigLake Iceberg table limitations](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#limitations)
-[^6]: [Google Cloud - BigQuery Quotas & Limits (Query Jobs)](https://cloud.google.com/bigquery/quotas#query_jobs)
-[^7]: [Google Cloud - BigQuery JSON functions and operators](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions)
-[^8]: [Google Cloud - BigQuery MERGE DML syntax](https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#merge_statement)
-
----
-
 ## Next Steps:
 To scale beyond direct SQL query size limits by leveraging automated GCS Parquet staging and BigQuery Data Transfer Service (DTS), proceed to **Stage 3: Using DTS to Ingest into Iceberg**:  
 **[../03_dts_to_iceberg/06_dts_parquet_migration.md](../03_dts_to_iceberg/06_dts_parquet_migration.md)**
+
+---
+
+## References
+
+1. [Google Cloud Architecture Center - Datashare lakehouse architecture](https://cloud.google.com/architecture/datashare-lakehouse)
+2. [Google Cloud - BigQuery standard SQL data types](https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types)
+3. [Google Cloud - Manage BigLake Iceberg tables (Create tables)](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#create-tables)
+4. [Apache Iceberg - Hidden Partitioning Specification](https://iceberg.apache.org/docs/latest/partitioning/)
+5. [Google Cloud - BigLake Iceberg table limitations](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#limitations)
+6. [Google Cloud - BigQuery Quotas & Limits (Query Jobs)](https://cloud.google.com/bigquery/quotas#query_jobs)
+7. [Google Cloud - BigQuery JSON functions and operators](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions)
+8. [Google Cloud - BigQuery MERGE DML syntax](https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#merge_statement)

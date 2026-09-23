@@ -2,8 +2,8 @@
 ## Part 5.1: Automated Schema Drift Detection & Evolution for BigLake Iceberg
 
 > **Section Overview:**  
-> In real-world data pipelines, upstream database schemas change: new columns are added over time. While BigQuery Native tables support `schema_update_options = ['ALLOW_FIELD_ADDITION']` [^1], BigQuery DTS and standard Load APIs **do not currently support automated schema evolution for BigLake Managed Apache Iceberg tables** [^2]. Attempting to load files with new columns causes DTS to abort with a schema mismatch error. In contrast, Apache Iceberg's specification fully supports schema evolution without rewriting existing data files [^3].  
-> This section presents an automated hybrid workaround: an Airflow pre-load task inspects incoming Parquet metadata in GCS via PyArrow [^4], applies `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` dynamically [^5], and only then triggers DTS to ingest the data without errors.
+> In real-world data pipelines, upstream database schemas change: new columns are added over time. While BigQuery Native tables support `schema_update_options = ['ALLOW_FIELD_ADDITION']` [1](https://cloud.google.com/bigquery/docs/managing-table-schemas), BigQuery DTS and standard Load APIs **do not currently support automated schema evolution for BigLake Managed Apache Iceberg tables** [2](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#limitations). Attempting to load files with new columns causes DTS to abort with a schema mismatch error. In contrast, Apache Iceberg's specification fully supports schema evolution without rewriting existing data files [3](https://iceberg.apache.org/docs/latest/evolution/#schema-evolution).  
+> This section presents an automated hybrid workaround: an Airflow pre-load task inspects incoming Parquet metadata in GCS via PyArrow [4](https://arrow.apache.org/docs/python/parquet.html), applies `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` dynamically [5](https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#alter_table_add_column_statement), and only then triggers DTS to ingest the data without errors.
 
 ---
 
@@ -25,13 +25,13 @@ flowchart LR
 
 ### The Two-Task Workflow:
 1. **Task 1 (`check_and_evolve_schema`)**:
-   - Inspects the incoming Parquet file metadata directly in GCS using `pyarrow.parquet.read_schema` [^4].
+   - Inspects the incoming Parquet file metadata directly in GCS using `pyarrow.parquet.read_schema` [4](https://arrow.apache.org/docs/python/parquet.html).
    - Fetches the current schema of the destination BigQuery Iceberg table using `BigQueryHook`.
    - Computes set differences (`new_cols = parquet_cols - bq_cols`).
    - Translates PyArrow physical data types (`int64`, `timestamp[us]`, `date32`, etc.) to BigQuery SQL types.
-   - Executes `ALTER TABLE <table_id> ADD COLUMN IF NOT EXISTS <col> <type>` [^5].
+   - Executes `ALTER TABLE <table_id> ADD COLUMN IF NOT EXISTS <col> <type>` [5](https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#alter_table_add_column_statement).
 2. **Task 2 (`trigger_dts_transfer`)**:
-   - Triggers the on-demand BigQuery Data Transfer Service (DTS) transfer run [^8]. Because the table schema has already been pre-expanded to match the Parquet file, DTS ingests the records smoothly without rejection.
+   - Triggers the on-demand BigQuery Data Transfer Service (DTS) transfer run [8](https://cloud.google.com/bigquery/docs/cloud-storage-transfer). Because the table schema has already been pre-expanded to match the Parquet file, DTS ingests the records smoothly without rejection.
 
 ---
 
@@ -50,13 +50,13 @@ google.api_core.exceptions.Forbidden: 403 Access Denied: User does not have bigq
 2. Locate your connection under **External connections** (e.g., `<LOCATION>.<CONNECTION_NAME>`).
 3. Click **Share Connection** / **Edit Permissions**.
 4. Add the Service Account used by Airflow (e.g., `<AIRFLOW_SA>@<PROJECT_ID>.iam.gserviceaccount.com`).
-5. Assign the **BigQuery Connection User** (`roles/bigquery.connectionUser`) role [^6].
+5. Assign the **BigQuery Connection User** (`roles/bigquery.connectionUser`) role [6](https://cloud.google.com/bigquery/docs/create-cloud-storage-table-biglake#grant-connection-access).
 
 ---
 
 ## 3. Destination BigQuery Iceberg Table Setup
 
-Initialize your managed Iceberg table in BigQuery with its initial schema [^7]:
+Initialize your managed Iceberg table in BigQuery with its initial schema [7](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#create-tables):
 
 ```sql
 CREATE SCHEMA IF NOT EXISTS `<YOUR_PROJECT_ID>.<YOUR_DATASET_ID>` 
@@ -79,7 +79,7 @@ OPTIONS (
 
 ## 4. BigQuery Data Transfer Service (DTS) Setup
 
-Configure the DTS transfer via Console [^8]:
+Configure the DTS transfer via Console [8](https://cloud.google.com/bigquery/docs/cloud-storage-transfer):
 
 1. Go to **BigQuery > Data Transfers > Create Transfer**.
 2. **Source**: Google Cloud Storage.
@@ -124,18 +124,18 @@ All new columns are present and correctly populated!
 
 ---
 
-## References
-
-[^1]: [Google Cloud - Modifying table schemas in BigQuery (ALLOW_FIELD_ADDITION)](https://cloud.google.com/bigquery/docs/managing-table-schemas)
-[^2]: [Google Cloud - BigLake Iceberg table limitations](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#limitations)
-[^3]: [Apache Iceberg - Schema Evolution Specification](https://iceberg.apache.org/docs/latest/evolution/#schema-evolution)
-[^4]: [Apache Arrow - Reading and Writing the Apache Parquet Format](https://arrow.apache.org/docs/python/parquet.html)
-[^5]: [Google Cloud - BigQuery ALTER TABLE ADD COLUMN statement](https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#alter_table_add_column_statement)
-[^6]: [Google Cloud - BigLake IAM permissions (Grant connection user access)](https://cloud.google.com/bigquery/docs/create-cloud-storage-table-biglake#grant-connection-access)
-[^7]: [Google Cloud - Manage BigLake Iceberg tables (Create tables)](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#create-tables)
-[^8]: [Google Cloud - Cloud Storage transfer in BigQuery DTS](https://cloud.google.com/bigquery/docs/cloud-storage-transfer)
+## Conclusion of Stage 5
+This concludes the 5-stage progression from conceptual foundations to enterprise-grade automated schema evolution. For an overview and roadmap of the complete playbook, return to the **[Master README](../../README.md)**.
 
 ---
 
-## Conclusion of Stage 5
-This concludes the 5-stage progression from conceptual foundations to enterprise-grade automated schema evolution. For an overview and roadmap of the complete playbook, return to the **[Master README](../../README.md)**.
+## References
+
+1. [Google Cloud - Modifying table schemas in BigQuery (ALLOW_FIELD_ADDITION)](https://cloud.google.com/bigquery/docs/managing-table-schemas)
+2. [Google Cloud - BigLake Iceberg table limitations](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#limitations)
+3. [Apache Iceberg - Schema Evolution Specification](https://iceberg.apache.org/docs/latest/evolution/#schema-evolution)
+4. [Apache Arrow - Reading and Writing the Apache Parquet Format](https://arrow.apache.org/docs/python/parquet.html)
+5. [Google Cloud - BigQuery ALTER TABLE ADD COLUMN statement](https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#alter_table_add_column_statement)
+6. [Google Cloud - BigLake IAM permissions (Grant connection user access)](https://cloud.google.com/bigquery/docs/create-cloud-storage-table-biglake#grant-connection-access)
+7. [Google Cloud - Manage BigLake Iceberg tables (Create tables)](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#create-tables)
+8. [Google Cloud - Cloud Storage transfer in BigQuery DTS](https://cloud.google.com/bigquery/docs/cloud-storage-transfer)

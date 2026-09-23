@@ -21,7 +21,7 @@
 
 Rather than maintaining two separate DAGs for initialization and daily runs:
 
-1. **Target Inspection:** The DAG queries BigQuery table row count [^1]:
+1. **Target Inspection:** The DAG queries BigQuery table row count [1](https://cloud.google.com/bigquery/docs/information-schema-tables):
    ```sql
    SELECT COUNT(1) FROM `<PROJECT>.<DATASET>.dts_managed_users`
    ```
@@ -29,7 +29,7 @@ Rather than maintaining two separate DAGs for initialization and daily runs:
    * **If count == 0:** Table is empty (cold start). The DAG extracts **all historical records** from MySQL without a time filter and writes `batch_users_full_load.parquet`.
    * **If count > 0:** Baseline exists. The DAG extracts only records where `updated_at` falls within the previous 24-hour execution window, naming the file `batch_users_incremental_YYYYMMDD.parquet`.
 3. **Zero Deletion:** Historical files remain stored in GCS; DTS is scoped to the specific target filename or execution window.
-4. **Format Enforcement:** Timestamps are coerced to microsecond precision (`coerce_timestamps='us'`) before writing Parquet bytes to GCS [^2].
+4. **Format Enforcement:** Timestamps are coerced to microsecond precision (`coerce_timestamps='us'`) before writing Parquet bytes to GCS [2](https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#type_conversions).
 
 ```mermaid
 flowchart TD
@@ -47,7 +47,7 @@ flowchart TD
 ## 2. BigQuery Table Schemas (DDL)
 
 ### 2.1. Staging: BigLake Managed Iceberg Table (History Layer)
-Create the Iceberg managed table backed by Cloud Storage [^3]:
+Create the Iceberg managed table backed by Cloud Storage [3](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#create-tables):
 ```sql
 CREATE OR REPLACE TABLE `<YOUR_PROJECT_ID>.<YOUR_DATASET>.dts_managed_users`
 (
@@ -85,7 +85,7 @@ PARTITION BY DATE(created_at);
 
 ## 3. BigQuery DTS Ingestion Setup
 
-Configure DTS via the BigQuery Console to automate ingestion into the Iceberg table [^4]:
+Configure DTS via the BigQuery Console to automate ingestion into the Iceberg table [4](https://cloud.google.com/bigquery/docs/cloud-storage-transfer):
 
 1. In BigQuery Console, navigate to **Data transfers** > **Create Transfer**.
 2. **Source:** Google Cloud Storage.
@@ -105,21 +105,21 @@ Configure DTS via the BigQuery Console to automate ingestion into the Iceberg ta
 > In production:
 > - Pass `chunksize=50000` to `pd.read_sql` to stream records.
 > - Write chunks using `pyarrow.parquet.ParquetWriter` sequentially.
-> - For very large tables (> 50 GB), consider Google Cloud Dataflow [^5] or Dataproc Serverless [^6].
-
----
-
-## References
-
-[^1]: [Google Cloud - BigQuery INFORMATION_SCHEMA.TABLES metadata](https://cloud.google.com/bigquery/docs/information-schema-tables)
-[^2]: [Google Cloud - Loading Parquet data into BigQuery (Type conversions & timestamps)](https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#type_conversions)
-[^3]: [Google Cloud - Manage BigLake Iceberg tables (Create tables)](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#create-tables)
-[^4]: [Google Cloud - Load Cloud Storage data using BigQuery Data Transfer Service](https://cloud.google.com/bigquery/docs/cloud-storage-transfer)
-[^5]: [Google Cloud - Dataflow (Unified stream and batch data processing)](https://cloud.google.com/dataflow)
-[^6]: [Google Cloud - Dataproc Serverless for Spark](https://cloud.google.com/dataproc-serverless/docs)
+> - For very large tables (> 50 GB), consider Google Cloud Dataflow [5](https://cloud.google.com/dataflow) or Dataproc Serverless [6](https://cloud.google.com/dataproc-serverless/docs).
 
 ---
 
 ## Next Steps in Stage 4:
 To implement the **canonical production-grade pattern** with date-partitioned GCS folders, Airflow Taskflow API, DTS sensors, and partition-pruned MERGE queries, proceed to:  
 **[09_reference_pipeline_date_prefix_sensor.md](09_reference_pipeline_date_prefix_sensor.md)**
+
+---
+
+## References
+
+1. [Google Cloud - BigQuery INFORMATION_SCHEMA.TABLES metadata](https://cloud.google.com/bigquery/docs/information-schema-tables)
+2. [Google Cloud - Loading Parquet data into BigQuery (Type conversions & timestamps)](https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#type_conversions)
+3. [Google Cloud - Manage BigLake Iceberg tables (Create tables)](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#create-tables)
+4. [Google Cloud - Load Cloud Storage data using BigQuery Data Transfer Service](https://cloud.google.com/bigquery/docs/cloud-storage-transfer)
+5. [Google Cloud - Dataflow (Unified stream and batch data processing)](https://cloud.google.com/dataflow)
+6. [Google Cloud - Dataproc Serverless for Spark](https://cloud.google.com/dataproc-serverless/docs)

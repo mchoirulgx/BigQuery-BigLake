@@ -2,7 +2,7 @@
 ## Part 3.1: GCS Staging Strategies (Post-Ingestion Deletion vs. Filename Detection) & BigQuery DTS Setup
 
 > **Section Overview & Core Staging Strategies:**  
-> For simplicity and ease of use, **BigQuery Data Transfer Service (DTS)** is often the preferred tool for lakehouse ingestion. While BigQuery DTS now features a native MySQL connector [^1], that connector only supports loading into proprietary BigQuery native tables. **DTS cannot ingest from MySQL directly into BigLake Managed Apache Iceberg tables.** Therefore, to land relational data into an open Iceberg lakehouse format using DTS, data must first be staged as Parquet files in Google Cloud Storage (GCS) using the DTS Cloud Storage transfer [^2].
+> For simplicity and ease of use, **BigQuery Data Transfer Service (DTS)** is often the preferred tool for lakehouse ingestion. While BigQuery DTS now features a native MySQL connector [1](https://cloud.google.com/bigquery/docs/mysql-transfer), that connector only supports loading into proprietary BigQuery native tables. **DTS cannot ingest from MySQL directly into BigLake Managed Apache Iceberg tables.** Therefore, to land relational data into an open Iceberg lakehouse format using DTS, data must first be staged as Parquet files in Google Cloud Storage (GCS) using the DTS Cloud Storage transfer [2](https://cloud.google.com/bigquery/docs/cloud-storage-transfer).
 >
 > When designing the GCS staging layer for DTS ingestion, two primary operational scenarios exist:
 > 
@@ -51,7 +51,7 @@ flowchart TD
 ## 2. BigQuery Table Schemas (DDL)
 
 ### 2.1. Staging: BigLake Managed Iceberg Table (History Layer)
-Create the Iceberg managed table backed by Cloud Storage [^3]:
+Create the Iceberg managed table backed by Cloud Storage [3](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#create-tables):
 ```sql
 CREATE OR REPLACE TABLE `<YOUR_PROJECT_ID>.<YOUR_DATASET>.dts_managed_users`
 (
@@ -93,7 +93,7 @@ By default, Python's `pandas` and `pyarrow` export datetime columns with **nanos
 
 > [!WARNING]
 > **BigQuery Timestamp Incompatibility:**  
-> BigQuery native `TIMESTAMP` and Iceberg schema specifications only support **microsecond precision** (`timestamp[us]`) [^4][^5]. If a Parquet file with nanoseconds is loaded via DTS, BigQuery fails with:
+> BigQuery native `TIMESTAMP` and Iceberg schema specifications only support **microsecond precision** (`timestamp[us]`) [4](https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#type_conversions) [5](https://arrow.apache.org/docs/python/generated/pyarrow.parquet.write_table.html). If a Parquet file with nanoseconds is loaded via DTS, BigQuery fails with:
 > ```text
 > Field created_at has type TIMESTAMP_NANOS, which cannot be converted to target type TIMESTAMP
 > ```
@@ -112,7 +112,7 @@ By default, Python's `pandas` and `pyarrow` export datetime columns with **nanos
 
 ## 4. BigQuery Data Transfer Service (DTS) Setup
 
-Configure DTS via the BigQuery Console to automate ingestion into the Iceberg table [^2]:
+Configure DTS via the BigQuery Console to automate ingestion into the Iceberg table [2](https://cloud.google.com/bigquery/docs/cloud-storage-transfer):
 
 1. Open **BigQuery Console** -> **Data transfers** -> **Create Transfer**.
 2. **Source:** Google Cloud Storage.
@@ -129,7 +129,7 @@ Configure DTS via the BigQuery Console to automate ingestion into the Iceberg ta
 
 ## 5. Merging to the Native Serving Table
 
-After DTS appends the delta Parquet file into `dts_managed_users`, run a MERGE query to upsert into `dts_native_users` [^6]:
+After DTS appends the delta Parquet file into `dts_managed_users`, run a MERGE query to upsert into `dts_native_users` [6](https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#merge_statement):
 
 ```sql
 MERGE `<YOUR_PROJECT_ID>.<YOUR_DATASET>.dts_native_users` T
@@ -166,17 +166,17 @@ WHEN NOT MATCHED AND S.deleted_at IS NULL THEN
 
 ---
 
-## References
-
-[^1]: [Google Cloud - BigQuery Data Transfer Service for MySQL](https://cloud.google.com/bigquery/docs/mysql-transfer)
-[^2]: [Google Cloud - Load Cloud Storage data using BigQuery Data Transfer Service](https://cloud.google.com/bigquery/docs/cloud-storage-transfer)
-[^3]: [Google Cloud - Manage BigLake Iceberg tables (Create tables)](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#create-tables)
-[^4]: [Google Cloud - Loading Parquet data into BigQuery (Type conversions & timestamps)](https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#type_conversions)
-[^5]: [Apache Arrow - PyArrow Parquet documentation](https://arrow.apache.org/docs/python/generated/pyarrow.parquet.write_table.html)
-[^6]: [Google Cloud - BigQuery MERGE DML syntax](https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#merge_statement)
-
----
-
 ## Next Steps in Stage 3:
 To automate the extraction, DTS execution, and MERGE inside an end-to-end Airflow DAG, proceed to:  
 **[07_dts_parquet_airflow_orchestration.md](07_dts_parquet_airflow_orchestration.md)**
+
+---
+
+## References
+
+1. [Google Cloud - BigQuery Data Transfer Service for MySQL](https://cloud.google.com/bigquery/docs/mysql-transfer)
+2. [Google Cloud - Load Cloud Storage data using BigQuery Data Transfer Service](https://cloud.google.com/bigquery/docs/cloud-storage-transfer)
+3. [Google Cloud - Manage BigLake Iceberg tables (Create tables)](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#create-tables)
+4. [Google Cloud - Loading Parquet data into BigQuery (Type conversions & timestamps)](https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#type_conversions)
+5. [Apache Arrow - PyArrow Parquet documentation](https://arrow.apache.org/docs/python/generated/pyarrow.parquet.write_table.html)
+6. [Google Cloud - BigQuery MERGE DML syntax](https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#merge_statement)
