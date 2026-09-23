@@ -2,11 +2,9 @@
 ## Part 1.1: Foundations of Lakehouse Architecture (Parquet vs. Hive vs. Iceberg)
 
 > **Section Overview:**  
-> This section introduces the core architectural motivation behind combining Google Cloud BigQuery, BigLake, and Apache Iceberg. It demystifies the three structural layers of a modern Data Lakehouse: the physical file format (Parquet), directory organization (Hive Partitioning), and the transactional metadata table format (Apache Iceberg).
+> This section introduces the core architectural consideration behind combining Google Cloud BigQuery, BigLake, and Apache Iceberg. It explains three structural layers of a Data Lakehouse: the physical file format (Parquet), directory organization (Hive Partitioning), and the transactional metadata table format (Apache Iceberg).
 
 ---
-
-When building a large-scale Data Lakehouse architecture, it is crucial to understand the distinct roles of the physical storage format, the directory organization method, and the logical table format layer. This document breaks down these three fundamental concepts, detailing their strengths and weaknesses.
 
 ---
 
