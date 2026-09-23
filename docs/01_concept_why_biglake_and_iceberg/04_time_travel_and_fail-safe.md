@@ -155,5 +155,5 @@ You have validated:
 3. Converting unmanaged Hive Parquet files into a fully transactional BigLake Managed Iceberg table.
 4. Understanding how BigLake Managed Iceberg table file is used and processed.
 
-Proceed to **Stage 2: Simple Ingestion**:  
+Proceed to **Stage : Simple Ingestion**:  
 **[../02_simple_ingestion/04_simple_parquet_external_table.md](../02_simple_ingestion/04_simple_parquet_external_table.md)**
