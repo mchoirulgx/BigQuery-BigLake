@@ -13,10 +13,10 @@
 This repository serves as a **practical demonstration and architectural guidance playbook** for building modern, open Data Lakehouses on **Google Cloud Platform (GCP)**. It integrates **BigQuery**, **BigLake Managed Tables (Apache Iceberg)**, **Cloud Storage (GCS)**, **BigQuery Data Transfer Service (DTS)**, and **Apache Airflow**.
 
 > **Context & Architectural Decisions:**  
-> - **Why DTS?** In many enterprise settings, teams choose BigQuery Data Transfer Service to preserve operational consistency with existing scheduled pipelines. While DTS has specific limitations (such as no direct database extraction and no native auto-schema evolution for Iceberg destinations), this playbook demonstrates how to overcome these limitations by combining lightweight Python extraction, GCS staging, and Airflow API orchestration.
-> - **GCS Staging Lifecycle Scenarios:** When staging Parquet files for DTS ingestion, two architectural strategies are contrasted:
->   1. **Scenario A (Post-Ingestion File Deletion):** Ephemeral staging where processed Parquet files are automatically deleted after DTS completes, keeping the landing bucket clean.
->   2. **Scenario B (Filename & Prefix Detection Without Deletion):** Immutable staging where files are permanently retained in GCS (e.g. `export_YYYYMMDD/` or dynamic filenames) for auditability and replay, using prefix/filename detection to prevent duplicate ingestion.
+> - **Why DTS?** In many enterprise settings, teams choose BigQuery DTS to preserve operational consistency and ease of configuration. While DTS has specific limitations (such as no direct database extraction and no native auto-schema evolution for Iceberg destinations), this playbook demonstrates how to overcome these limitations by combining lightweight Python extraction, GCS staging, and Airflow API orchestration.
+> - **GCS Staging Lifecycle Scenarios:** When staging Parquet files for DTS ingestion, two technical options are implemented:
+>   1. **Scenario A (Post-Ingestion File Deletion):** Ephemeral staging; processed Parquet files are automatically deleted after DTS completes, keeping the landing bucket clean.
+>   2. **Scenario B (Filename & Prefix Detection Without Deletion):** Immutable staging; files are permanently retained in GCS (e.g. `export_YYYYMMDD/` or dynamic filenames) for auditability and replay, using prefix/filename detection to prevent duplicate ingestion.
 > - **Demo + Guidance Scope:** The sample data volumes in this repository are intentionally compact and reproducible so engineers can validate concepts quickly in sandbox GCP environments without incurring high compute costs.
 
 ---
