@@ -39,7 +39,7 @@ gcloud storage rm -r gs://<YOUR_BUCKET_NAME>/poc_raw_data/nyc_taxi/data_file_yea
 ---
 
 ### Step 2: Create the Staging Table (External / Unmanaged)
-Create an External Table bridge so BigQuery can read raw Parquet files and interpret the Hive directory structure as columns (`data_file_year`, `data_file_month`).
+Create an External Table bridge so BigQuery can read raw Parquet files and interpret the Hive directory structure as columns (`data_file_year`, `data_file_month`).[^1]
 
 *Run in BigQuery Studio:*
 ```sql
@@ -59,7 +59,7 @@ OPTIONS (
 ---
 
 ### Step 3: Materialize into a BigLake Managed Iceberg Table
-Instruct BigQuery to read from the staging table and write an Apache Iceberg table format (data + metadata manifests) to a new, empty GCS destination. BigQuery takes ownership of this location as the table catalog.
+Instruct BigQuery to read from the staging table and write an Apache Iceberg table format (data + metadata manifests) to a new, empty GCS destination. BigQuery takes ownership of this location as the table catalog.[^2]
 
 *Run in BigQuery Studio:*
 ```sql
@@ -73,11 +73,12 @@ OPTIONS (
 ) AS 
 SELECT * FROM `<YOUR_PROJECT_ID>.<YOUR_DATASET>.staging_nyc_taxi_raw`;
 ```
+*(Integer range partitioning prunes partition scans during analytics queries).[^3]*
 
 ---
 
 ### Step 4: Validate ACID DML Capabilities
-Once Step 3 completes, standard SQL CRUD operations can be executed against the Iceberg table. BigQuery will update metadata manifests and generate new Parquet files seamlessly in GCS.
+Once Step 3 completes, standard SQL CRUD operations can be executed against the Iceberg table. BigQuery will update metadata manifests and generate new Parquet files seamlessly in GCS.[^4]
 
 #### 1. Aggregate Query (Read OLAP):
 ```sql
@@ -93,7 +94,7 @@ ORDER BY total_trips DESC;
 
 #### 2. Row-Level UPDATE:
 ```sql
--- Iceberg allows direct row modification without rewriting untouched partitions
+-- Iceberg allows direct row modification without rewriting untouched partitions [^5]
 UPDATE `<YOUR_PROJECT_ID>.<YOUR_DATASET>.managed_nyc_taxi_iceberg`
 SET passenger_count = 1
 WHERE passenger_count IS NULL 
@@ -102,10 +103,20 @@ WHERE passenger_count IS NULL
 
 #### 3. Row-Level DELETE:
 ```sql
--- Safely purge negative fare errors natively
+-- Safely purge negative fare errors natively [^4]
 DELETE FROM `<YOUR_PROJECT_ID>.<YOUR_DATASET>.managed_nyc_taxi_iceberg`
 WHERE total_amount < 0;
 ```
+
+---
+
+## References
+
+[^1]: [Google Cloud BigQuery: Hive partitioned queries over Cloud Storage](https://cloud.google.com/bigquery/docs/hive-partitioned-queries-gcs)
+[^2]: [Google Cloud BigQuery: Create Apache Iceberg managed tables](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#create-tables)
+[^3]: [Google Cloud BigQuery: Integer range partitioned tables](https://cloud.google.com/bigquery/docs/creating-integer-range-partitions)
+[^4]: [Google Cloud BigQuery: DML operations on BigLake Iceberg tables](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#dml)
+[^5]: [Apache Iceberg: Row-Level Mutations & Position Deletes](https://iceberg.apache.org/spec/#row-level-delete-schemas)
 
 ---
 

@@ -13,7 +13,7 @@
 
 ## Step 1: Data Type Mapping (Source to BigQuery)
 
-When exporting relational data (such as from SQL Server or MySQL) into Parquet using PyArrow, data types are mapped into BigQuery types:
+When exporting relational data (such as from SQL Server or MySQL) into Parquet using PyArrow, data types are mapped into BigQuery types [^1]:
 
 | Source System Type | Parquet Logical Type (PyArrow) | Destination (BigQuery) | Technical Notes |
 | :--- | :--- | :--- | :--- |
@@ -27,7 +27,7 @@ When exporting relational data (such as from SQL Server or MySQL) into Parquet u
 
 ## Step 2: External Table Creation DDL
 
-Run the following SQL in BigQuery Studio to map your GCS Parquet path to BigQuery using the BigLake Cloud Resource connection:
+Run the following SQL in BigQuery Studio to map your GCS Parquet path to BigQuery using the BigLake Cloud Resource connection [^2]:
 
 ```sql
 CREATE OR REPLACE EXTERNAL TABLE `<YOUR_PROJECT_ID>.<YOUR_DATASET>.parquet_data`
@@ -45,7 +45,7 @@ OPTIONS (
 
 ## Step 3: Immutability and CRUD Limitations
 
-External tables over raw Parquet files are strictly **Read-Only**:
+External tables over raw Parquet files are strictly **Read-Only** and do not support DML statements [^3]:
 
 | Storage Format | Read (SELECT) | Insert (ADD) | Update (MODIFY) | Delete (REMOVE) | Primary Use Case |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -57,7 +57,7 @@ External tables over raw Parquet files are strictly **Read-Only**:
 
 ## Step 4: Materializing to Native BigQuery for DML
 
-If row-level mutations are needed from an immutable external Parquet table, the data must be materialized into a Native BigQuery table (or an Iceberg table):
+If row-level mutations are needed from an immutable external Parquet table, the data must be materialized into a Native BigQuery table (or an Iceberg table) via CTAS [^4][^5]:
 
 ```sql
 -- Materialize into a native table
@@ -85,6 +85,16 @@ The BigLake connection SA has read permissions, but the specific URI pattern did
 
 **Solution:**
 Verify the exact folder path using `gcloud storage ls gs://<YOUR_BUCKET_NAME>/sql_server_data/`.
+
+---
+
+## References
+
+[^1]: [Google Cloud - Parquet type conversions in BigQuery](https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-parquet#parquet_conversions)
+[^2]: [Google Cloud - Create a BigLake Cloud Storage table](https://cloud.google.com/bigquery/docs/create-cloud-storage-table-biglake)
+[^3]: [Google Cloud - External table limitations in BigQuery](https://cloud.google.com/bigquery/docs/external-tables#limitations)
+[^4]: [Google Cloud - Create a table from a query result](https://cloud.google.com/bigquery/docs/tables#create-table-query)
+[^5]: [Google Cloud - Data manipulation language (DML) statements](https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax)
 
 ---
 

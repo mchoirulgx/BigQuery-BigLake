@@ -56,16 +56,16 @@ graph TD
 
 ### 2.1. Apache Airflow Tasks
 1. **Extract & Transform (`PythonOperator`):** Dynamically checks if the BigQuery target table contains rows. If empty, it extracts all rows (Full Load); if populated, it extracts the last 24 hours of updates (Incremental Load). Converts to Parquet with `coerce_timestamps='us'` and uploads to GCS.
-2. **Trigger Ingestion (`BigQueryDataTransferServiceStartTransferRunsOperator`):** Invokes the BigQuery DTS API to start a transfer run targeting the BigLake Iceberg table.
-3. **Trigger Merge (`BigQueryDataTransferServiceStartTransferRunsOperator`):** Invokes the Scheduled Query transfer run to execute the deduplicating `MERGE` query.
+2. **Trigger Ingestion (`BigQueryDataTransferServiceStartTransferRunsOperator` [^1]):** Invokes the BigQuery DTS API to start a transfer run targeting the BigLake Iceberg table [^2].
+3. **Trigger Merge (`BigQueryDataTransferServiceStartTransferRunsOperator` [^1]):** Invokes the Scheduled Query transfer run to execute the deduplicating `MERGE` query [^3].
 
 > [!WARNING]
 > **Important Orchestration Note on Asynchronous Execution:**  
-> The `BigQueryDataTransferServiceStartTransferRunsOperator` starts the transfer run asynchronously and completes almost immediately (within 2–5 seconds).  
+> The `BigQueryDataTransferServiceStartTransferRunsOperator` starts the transfer run asynchronously and completes almost immediately (within 2–5 seconds) [^1][^2].  
 > In this basic Stage 3 demo, tasks are chained sequentially:
 > `task_extract_upload >> task_run_dts_parquet >> task_run_dts_merge`.  
 > In production environments with larger data volumes, triggering the merge immediately can cause a race condition if DTS has not yet finished copying files.  
-> **Recommended Solution:** Gate downstream tasks with `BigQueryDataTransferServiceTransferRunSensor`, demonstrated in **Stage 4: [09_reference_pipeline_date_prefix_sensor.md](../04_incremental_loading/09_reference_pipeline_date_prefix_sensor.md)**.
+> **Recommended Solution:** Gate downstream tasks with `BigQueryDataTransferServiceTransferRunSensor` [^1], demonstrated in **Stage 4: [09_reference_pipeline_date_prefix_sensor.md](../04_incremental_loading/09_reference_pipeline_date_prefix_sensor.md)**.
 
 ---
 
@@ -73,7 +73,7 @@ graph TD
 
 Since Airflow manages the trigger timing via API, configure these transfers in BigQuery as **On-demand** (no internal cron schedule):
 
-### 3.1. DTS Parquet Ingestion Config
+### 3.1. DTS Parquet Ingestion Config [^4]
 1. In BigQuery Console, navigate to **Data transfers** > **Create Transfer**.
 2. **Source:** Google Cloud Storage.
 3. **Schedule:** `On-demand`.
@@ -82,7 +82,7 @@ Since Airflow manages the trigger timing via API, configure these transfers in B
 6. **Write preference:** `APPEND`.
 7. **File format:** `PARQUET`.
 
-### 3.2. Scheduled Query Merge Config
+### 3.2. Scheduled Query Merge Config [^3]
 Create a Scheduled Query set to `On-demand`:
 ```sql
 MERGE `<YOUR_PROJECT_ID>.<YOUR_DATASET>.dts_native_users` T
@@ -115,15 +115,28 @@ WHEN NOT MATCHED AND S.deleted_at IS NULL THEN
 When modifying or deleting data in Iceberg tables, understanding how data is physically removed from Google Cloud Storage is critical.
 
 ### 4.1. How `DELETE` Works in Iceberg
-* **Logical Deletion via Snapshots:** Executing `DELETE FROM dts_managed_users WHERE ...` produces a new Iceberg snapshot that excludes the deleted records. The records immediately disappear from standard queries.
+* **Logical Deletion via Snapshots:** Executing `DELETE FROM dts_managed_users WHERE ...` produces a new Iceberg snapshot that excludes the deleted records [^5]. The records immediately disappear from standard queries.
 * **Physical Storage:** The underlying `.parquet` files in GCS are **not deleted immediately**. This guarantees ACID isolation and powers Iceberg's **Time Travel** capabilities.
 
 ### 4.2. Garbage Collection & Automated Maintenance in BigLake
-In self-managed open-source Iceberg (e.g. Spark/Flink on Dataproc), data engineers must schedule maintenance jobs to call `expireSnapshots` and remove orphaned files.
+In self-managed open-source Iceberg (e.g. Spark/Flink on Dataproc), data engineers must schedule maintenance jobs to call `expireSnapshots` and remove orphaned files [^6].
 
-With **BigLake Managed Tables (`table_format = 'ICEBERG'`)**, Google Cloud automates background maintenance:
-1. **Retention Window (Time Travel):** BigQuery manages Iceberg snapshot retention using the dataset's **Time Travel Window** (default is 7 days, configurable between 2 to 7 days).
-2. **Automated Garbage Collection:** Once a snapshot exceeds the Time Travel window, BigQuery's automated maintenance engine deletes orphaned Parquet files and manifest lists from GCS, reducing physical storage consumption without requiring Spark or external cron jobs.
+With **BigLake Managed Tables (`table_format = 'ICEBERG'`)**, Google Cloud automates background maintenance [^7]:
+1. **Retention Window (Time Travel):** BigQuery manages Iceberg snapshot retention using the dataset's **Time Travel Window** (default is 7 days, configurable between 2 to 7 days) [^7][^8].
+2. **Automated Garbage Collection:** Once a snapshot exceeds the Time Travel window, BigQuery's automated maintenance engine deletes orphaned Parquet files and manifest lists from GCS, reducing physical storage consumption without requiring Spark or external cron jobs [^7].
+
+---
+
+## References
+
+[^1]: [Apache Airflow - Google Cloud BigQuery DTS Operators](https://airflow.apache.org/docs/apache-airflow-providers-google/stable/operators/cloud/bigquery_dts.html)
+[^2]: [Google Cloud - BigQuery Data Transfer Service API (startManualRuns)](https://cloud.google.com/bigquery/docs/reference/datatransfer/rest/v1/projects.locations.transferConfigs/startManualRuns)
+[^3]: [Google Cloud - Scheduling queries in BigQuery](https://cloud.google.com/bigquery/docs/scheduling-queries)
+[^4]: [Google Cloud - Cloud Storage transfer in BigQuery DTS](https://cloud.google.com/bigquery/docs/cloud-storage-transfer)
+[^5]: [Apache Iceberg - Table Spec (Snapshots and Manifests)](https://iceberg.apache.org/docs/latest/spec/)
+[^6]: [Apache Iceberg - Table Maintenance (Expire Snapshots)](https://iceberg.apache.org/docs/latest/maintenance/#expire-snapshots)
+[^7]: [Google Cloud - Manage BigLake Iceberg tables (Automatic maintenance)](https://cloud.google.com/bigquery/docs/biglake-iceberg-tables-in-bigquery#automatic-maintenance)
+[^8]: [Google Cloud - Data retention with time travel and fail-safe](https://cloud.google.com/bigquery/docs/time-travel)
 
 ---
 
