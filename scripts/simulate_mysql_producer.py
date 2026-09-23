@@ -68,17 +68,19 @@ def generate_and_upload():
     df['order_date'] = pd.to_datetime(df['order_date']).dt.date
     df['created_at'] = pd.to_datetime(df['created_at'])
 
-    # Save to local temporary Parquet file
-    df.to_parquet(FILE_NAME, engine="pyarrow", index=False)
+    # Save to local temporary Parquet file with microsecond timestamp precision
+    df.to_parquet(FILE_NAME, engine="pyarrow", index=False, coerce_timestamps="us")
 
-    # Upload to Cloud Storage
-    client = storage.Client(project=PROJECT_ID)
-    bucket = client.bucket(BUCKET_NAME)
-    blob = bucket.blob(GCS_DESTINATION_PATH)
-    blob.upload_from_filename(FILE_NAME)
-
-    print(f"Successfully uploaded: gs://{BUCKET_NAME}/{GCS_DESTINATION_PATH}")
-    os.remove(FILE_NAME)
+    # Upload to Cloud Storage with reliable cleanup
+    try:
+        client = storage.Client(project=PROJECT_ID)
+        bucket = client.bucket(BUCKET_NAME)
+        blob = bucket.blob(GCS_DESTINATION_PATH)
+        blob.upload_from_filename(FILE_NAME)
+        print(f"Successfully uploaded: gs://{BUCKET_NAME}/{GCS_DESTINATION_PATH}")
+    finally:
+        if os.path.exists(FILE_NAME):
+            os.remove(FILE_NAME)
 
 if __name__ == "__main__":
     generate_and_upload()

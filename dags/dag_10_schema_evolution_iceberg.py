@@ -34,13 +34,15 @@ DEMO VS. PRODUCTION NOTES:
 """
 
 from datetime import datetime, timezone
+from io import BytesIO
 from airflow import DAG
 from airflow.decorators import task
 from airflow.providers.google.cloud.hooks.bigquery import BigQueryHook
+from airflow.providers.google.cloud.hooks.gcs import GCSHook
 from airflow.providers.google.cloud.operators.bigquery_dts import BigQueryDataTransferServiceStartTransferRunsOperator
+from airflow.providers.google.cloud.sensors.bigquery_dts import BigQueryDataTransferServiceTransferRunSensor
 import pyarrow.parquet as pq
 import pyarrow.types as types
-import gcsfs
 
 default_args = {
     'owner': 'airflow',
@@ -58,8 +60,9 @@ with DAG(
     @task
     def check_and_evolve_schema(bucket: str, prefix: str, project_id: str, dataset_id: str, table_id: str):
         """
-        Reads GCS Parquet metadata, compares schema against BigQuery Iceberg table,
-        and dynamically alters the BigQuery table schema if new columns exist.
+        Reads GCS Parquet metadata across all landed files, compares schema
+        against BigQuery Iceberg table, and dynamically alters the BigQuery table schema
+        if new columns exist.
         """
         
         def map_pyarrow_to_bq_type(pa_type) -> str:
@@ -79,17 +82,25 @@ with DAG(
             elif types.is_decimal(pa_type):
                 return "NUMERIC"
             else:
-                return "STRING"  # Fallback type
+                raise ValueError(f"Unsupported PyArrow type for auto-schema evolution: {pa_type}")
 
-        # 1. Inspect PyArrow schema from GCS landing zone
-        fs = gcsfs.GCSFileSystem()
-        files = fs.glob(f"gs://{bucket}/{prefix}*.parquet")
-        if not files:
+        # 1. Inspect PyArrow schema across ALL Parquet files in GCS landing zone
+        gcs_hook = GCSHook(gcp_conn_id='google_cloud_default')
+        blob_names = gcs_hook.list(bucket_name=bucket, prefix=prefix)
+        parquet_blobs = [b for b in blob_names if b.endswith('.parquet')]
+        if not parquet_blobs:
             print("No files found in landing zone.")
             return
-            
-        parquet_schema = pq.read_schema(f"gs://{files[0]}")
-        parquet_cols = set(parquet_schema.names)
+
+        # Compute cumulative schema union across all files
+        unified_fields = {}
+        for blob_name in parquet_blobs:
+            file_bytes = gcs_hook.download(bucket_name=bucket, object_name=blob_name)
+            schema = pq.read_schema(BytesIO(file_bytes))
+            for field in schema:
+                if field.name not in unified_fields:
+                    unified_fields[field.name] = field.type
+        parquet_cols = set(unified_fields.keys())
         
         # 2. Inspect current BigQuery Iceberg schema
         bq_hook = BigQueryHook(gcp_conn_id='google_cloud_default')
@@ -102,7 +113,7 @@ with DAG(
         if new_cols:
             alter_statements = []
             for col in new_cols:
-                pa_type = parquet_schema.field(col).type
+                pa_type = unified_fields[col]
                 bq_type = map_pyarrow_to_bq_type(pa_type)
                 print(f"[SCHEMA EVOLUTION] New column detected: '{col}' ({pa_type}) -> BQ Type: '{bq_type}'")
                 alter_statements.append(f"ADD COLUMN IF NOT EXISTS `{col}` {bq_type}")
@@ -130,8 +141,23 @@ with DAG(
         project_id='<YOUR_PROJECT_ID>',
         transfer_config_id="<YOUR_DTS_TRANSFER_CONFIG_ID>", 
         location='<YOUR_LOCATION>',
-        requested_run_time={"seconds": int(datetime.now(timezone.utc).timestamp())},
+        requested_run_time={"seconds": "{{ data_interval_end.int_timestamp }}"},
+        gcp_conn_id='google_cloud_default',
+    )
+
+    # Task 3: Wait for DTS transfer run to complete
+    wait_for_dts = BigQueryDataTransferServiceTransferRunSensor(
+        task_id="wait_for_dts_transfer",
+        project_id='<YOUR_PROJECT_ID>',
+        transfer_config_id="<YOUR_DTS_TRANSFER_CONFIG_ID>",
+        location='<YOUR_LOCATION>',
+        run_id="{{ task_instance.xcom_pull(task_ids='trigger_dts_transfer', key='return_value').name.split('/')[-1] }}",
+        expected_statuses={"SUCCEEDED"},
+        poke_interval=30,
+        timeout=1200,
+        mode='reschedule',
+        gcp_conn_id='google_cloud_default',
     )
 
     # Execution Flow
-    schema_task >> trigger_dts
+    schema_task >> trigger_dts >> wait_for_dts

@@ -7,7 +7,7 @@ File: dags/dag_09_reference_pipeline_date_prefix.py
 PURPOSE:
   CANONICAL REFERENCE PIPELINE DEMO:
   Orchestrates an end-to-end robust Lakehouse ingestion pipeline:
-  1. Generates / extracts CDC data from MySQL (`transaksi_bank`).
+  1. Generates / extracts incremental batch data from MySQL (`transaksi_bank`).
   2. Dynamically decides between Full Load and Delta Load.
   3. Coerces timestamps to UTC microsecond precision (`coerce_timestamps='us'`).
   4. Writes Parquet to date-partitioned GCS folders (`data_transaksi/export_YYYYMMDD/`).
@@ -138,8 +138,9 @@ with DAG(
     # ---------------------------------------------------------
     @task
     def check_initial_load(ds=None, **kwargs):
-        from google.cloud import bigquery
-        client = bigquery.Client(project=PROJECT_ID)
+        from airflow.providers.google.cloud.hooks.bigquery import BigQueryHook
+        bq_hook = BigQueryHook(gcp_conn_id=GCP_CONN_ID, use_legacy_sql=False)
+        client = bq_hook.get_client(project_id=PROJECT_ID)
 
         # Check if native table is empty
         query = f"SELECT COUNT(*) as cnt FROM `{PROJECT_ID}.{DATASET_ID}.final_transaksi`"
@@ -247,6 +248,7 @@ with DAG(
         expected_statuses={"SUCCEEDED"},
         poke_interval=30,
         timeout=1200,
+        mode='reschedule',
         gcp_conn_id=GCP_CONN_ID,
     )
 

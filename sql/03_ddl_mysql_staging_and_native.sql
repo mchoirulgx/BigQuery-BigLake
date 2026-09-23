@@ -63,9 +63,8 @@ USING (
   QUALIFY ROW_NUMBER() OVER(PARTITION BY id ORDER BY updated_at DESC) = 1
 ) S
 ON T.id = S.id
-   -- Partition pruning on target table
-   AND T.created_at >= TIMESTAMP_SUB(S.created_at, INTERVAL 1 DAY)
-   AND T.created_at <= TIMESTAMP_ADD(S.created_at, INTERVAL 1 DAY)
+   -- Strict equi-join on partition column enables BigQuery partition pruning
+   AND DATE(T.created_at) = DATE(S.created_at)
 WHEN MATCHED AND S.deleted_at IS NOT NULL THEN
   DELETE
 WHEN MATCHED THEN

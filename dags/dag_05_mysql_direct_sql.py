@@ -5,8 +5,8 @@ Stage: Stage 2 - Simple Ingestion
 File: dags/dag_05_mysql_direct_sql.py
 
 PURPOSE:
-  Demonstrates an educational prototype pipeline that extracts CDC data from a
-  relational MySQL database and ingests it directly into a BigLake Managed
+  Demonstrates an educational prototype pipeline that extracts incremental data (via
+  updated_at watermark) from a relational MySQL database and ingests it directly into a BigLake Managed
   Iceberg table (`history_users`) using BigQuery SQL DML and JSON UNNEST,
   followed by an upsert MERGE into the native BigQuery serving table (`managed_main_users`).
 

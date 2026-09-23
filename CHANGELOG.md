@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0] - 2026-09-23
+
+### Summary
+Comprehensive code review remediation bringing all SQL scripts, Airflow DAGs, and documentation into 100% compliance with Google Cloud Well-Architected Framework and BigLake Iceberg best practices.
+
+### Fixed & Hardened
+- **P0 Schema Alignment (`sql/04_ddl_reference_staging_and_native.sql`)**:
+  - Aligned transaction identifier `id_transaksi` from `INT64` to `STRING` and `jumlah` from `NUMERIC` to `FLOAT64`, eliminating fatal DTS schema mismatch exceptions and achieving 100% parity with PyArrow schemas, MySQL source tables, and documentation.
+- **P0 Stage 5 Schema Evolution Hardening (`dags/dag_10_schema_evolution_iceberg.py`)**:
+  - Replaced ambient `gcsfs` with enterprise `GCSHook` using Airflow connection credentials.
+  - Implemented multi-file schema union across all landed Parquet files to detect schema additions across batch splits.
+  - Replaced parse-time `datetime.now()` evaluation with dynamic Jinja templating `{{ data_interval_end.int_timestamp }}`.
+  - Added `BigQueryDataTransferServiceTransferRunSensor` in `reschedule` mode to guarantee DTS ingestion completes before downstream dependencies.
+  - Replaced silent fallback to `STRING` with defensive validation and explicit error handling for unsupported PyArrow types.
+- **P0 Stage 3 Ingestion Race Condition (`dags/dag_07_dts_parquet_to_iceberg.py`)**:
+  - Inserted `BigQueryDataTransferServiceTransferRunSensor` (`mode='reschedule'`) between the asynchronous DTS trigger and the downstream MERGE query, preventing premature MERGE execution against uncommitted Iceberg data.
+- **P1 Partition Pruning Optimization (`sql/03_ddl_mysql_staging_and_native.sql`)**:
+  - Replaced broken non-equi join timestamp range with strict equi-join `AND DATE(T.created_at) = DATE(S.created_at)`, enabling BigQuery to prune partitions dynamically.
+- **P1 Airflow Security & Connection Integrity (`dags/dag_09_reference_pipeline_date_prefix.py`)**:
+  - Refactored `check_initial_load` to use `BigQueryHook` and Airflow connections instead of ambient unmanaged client instantiations.
+  - Added `mode='reschedule'` to `BigQueryDataTransferServiceTransferRunSensor` to prevent Airflow worker slot starvation.
+- **P1 Documentation Accuracy & DTS Destination Constraint (`docs/03_dts_to_iceberg/06_dts_parquet_migration.md`)**:
+  - Clarified that GCS staging is mandatory because the native DTS MySQL connector only supports native BigQuery tables and cannot target BigLake Managed Apache Iceberg tables.
+- **P1 Navigation & Repository Structure Synchronization (`README.md`)**:
+  - Corrected numbering drift across `README.md` table and repository layout tree to exactly match physical file paths on disk.
+- **P2 CDC Terminology Precision Across Documentation & DAGs**:
+  - Re-labeled all claims of "MySQL CDC" to **"Timestamp-Based Incremental Extraction"** across `docs/02_simple_ingestion/05_mysql_to_iceberg_direct_sql.md`, `docs/04_incremental_loading/09_reference_pipeline_date_prefix_sensor.md`, `README.md`, and DAG docstrings (`dag_05`, `dag_09`). Retained clean batch extraction logic without adding unnecessary streaming CDC infrastructure.
+- **P2 Iceberg POC Partitioning (`sql/02_ddl_poc_nyc_taxi_iceberg.sql`, `docs/01_concept_why_biglake_and_iceberg/03_poc_hive_to_managed_iceberg.md`)**:
+  - Added explicit `PARTITION BY RANGE_BUCKET(data_file_month, GENERATE_ARRAY(1, 12, 1))` to the CTAS statement to demonstrate true partition pruning on BigLake Iceberg tables.
+- **Producer Script Reliability (`scripts/simulate_mysql_producer.py`)**:
+  - Added `coerce_timestamps='us'` to ensure microsecond timestamp resolution and wrapped Cloud Storage upload in `try...finally` to ensure reliable temporary file cleanup.
+
+---
+
 ## [2.0.0] - 2026-09-22
 
 ### Summary

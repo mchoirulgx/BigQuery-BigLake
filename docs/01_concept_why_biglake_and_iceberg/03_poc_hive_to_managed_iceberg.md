@@ -65,6 +65,7 @@ Instruct BigQuery to read from the staging table and write an Apache Iceberg tab
 ```sql
 CREATE OR REPLACE TABLE `<YOUR_PROJECT_ID>.<YOUR_DATASET>.managed_nyc_taxi_iceberg`
 WITH CONNECTION `<YOUR_REGION>.<YOUR_CONNECTION_ID>`
+PARTITION BY RANGE_BUCKET(data_file_month, GENERATE_ARRAY(1, 12, 1))
 OPTIONS (
     file_format = 'PARQUET',
     table_format = 'ICEBERG',

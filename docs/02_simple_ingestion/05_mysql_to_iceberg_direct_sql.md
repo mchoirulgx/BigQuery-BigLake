@@ -1,5 +1,5 @@
 # Stage 2: Simple Ingestion
-## Part 2.2: MySQL CDC to Iceberg via Direct SQL (Educational Prototype)
+## Part 2.2: MySQL Incremental Extraction to Iceberg via Direct SQL (Educational Prototype)
 
 > **Section Overview:**  
 > This section demonstrates a direct relational-to-lakehouse migration pipeline from MySQL into a BigLake Managed Iceberg table (`history_users`), followed by an idempotent MERGE into a native BigQuery serving table (`managed_main_users`). It explores how SQL DML can be used directly on Iceberg tables via JSON UNNEST, and explains why enterprise production pipelines transition to DTS + GCS staging.
@@ -15,7 +15,7 @@
 ## 1. Architecture: Two-Tier Medallion Pattern
 
 The architecture employs a two-tier approach to balance storage costs, historical auditability, and query performance:
-1. **History Layer (Bronze / Staging):** Uses **Apache Iceberg (BigLake Managed Table)** backed by Google Cloud Storage (GCS). This layer acts as an append-only staging area for all incoming data and historical state changes.
+1. **History Layer (Bronze / Staging):** Uses **Apache Iceberg (BigLake Managed Table)** backed by Google Cloud Storage (GCS). This layer acts as an append-only staging area for all incremental batch extracts.
 2. **Main Layer (Gold / Production Serving):** Uses **BigQuery Native Tables**. This layer reflects the deduplicated, latest state of the data by merging changes from the History layer and resolving soft deletes.
 
 ```mermaid

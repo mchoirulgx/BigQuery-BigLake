@@ -35,12 +35,10 @@ DEMO VS. PRODUCTION NOTES:
   - IMPORTANT ORCHESTRATION LESSON:
     `BigQueryDataTransferServiceStartTransferRunsOperator` triggers the transfer
     asynchronously and completes immediately (within a few seconds).
-  - In this basic Stage 3 demo, tasks are chained directly:
-    `task_extract_upload >> task_run_dts_parquet >> task_run_dts_merge`.
-  - In production, placing `task_run_dts_merge` immediately after the DTS trigger
-    can cause a race condition if DTS has not finished copying files.
-  - To see the hardened pattern using `BigQueryDataTransferServiceTransferRunSensor`
-    to wait for DTS completion, see Stage 4: `dag_09_reference_pipeline_date_prefix.py`.
+  - To prevent a race condition where the downstream MERGE query executes before
+    DTS has finished copying files into the Iceberg table, this DAG includes
+    `BigQueryDataTransferServiceTransferRunSensor` (`task_wait_dts_parquet`) in
+    `reschedule` mode to guarantee data has landed before merging.
 ===============================================================================
 """
 
@@ -53,6 +51,7 @@ from airflow.operators.python import PythonOperator
 from airflow.providers.google.cloud.hooks.bigquery import BigQueryHook
 from airflow.providers.google.cloud.hooks.gcs import GCSHook
 from airflow.providers.google.cloud.operators.bigquery_dts import BigQueryDataTransferServiceStartTransferRunsOperator
+from airflow.providers.google.cloud.sensors.bigquery_dts import BigQueryDataTransferServiceTransferRunSensor
 from airflow.providers.mysql.hooks.mysql import MySqlHook
 
 # --- CONFIGURATION ---
@@ -161,6 +160,18 @@ with DAG(
         gcp_conn_id='google_cloud_default',
     )
 
+    # TASK 2B: Wait for DTS Parquet Ingestion to complete (Prevents race condition)
+    task_wait_dts_parquet = BigQueryDataTransferServiceTransferRunSensor(
+        task_id='wait_for_dts_parquet',
+        transfer_config_id=DTS_PARQUET_CONFIG_NAME.split('/')[-1],
+        run_id="{{ task_instance.xcom_pull(task_ids='run_dts_parquet_to_managed_table', key='return_value').name.split('/')[-1] }}",
+        expected_statuses={"SUCCEEDED"},
+        poke_interval=30,
+        timeout=1200,
+        mode='reschedule',
+        gcp_conn_id='google_cloud_default',
+    )
+
     # TASK 3: Trigger DTS Scheduled Query for Merging
     task_run_dts_merge = BigQueryDataTransferServiceStartTransferRunsOperator(
         task_id='run_dts_scheduled_query_merge',
@@ -169,4 +180,4 @@ with DAG(
     )
 
     # Pipeline execution order
-    task_extract_upload >> task_run_dts_parquet >> task_run_dts_merge
+    task_extract_upload >> task_run_dts_parquet >> task_wait_dts_parquet >> task_run_dts_merge

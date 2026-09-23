@@ -15,7 +15,7 @@
 --      - `{bucket_name}`: Your Cloud Storage Bucket.
 --      - `{connection_id}`: Your BigLake Cloud Resource connection ID.
 --   2. In Step 1, copy sample data to your GCS bucket:
---      gcloud storage cp -r gs://bigquery-gallery-public-data-test/poc_raw_data/nyc_taxi gs://{bucket_name}/poc_raw_data/
+--      gcloud storage cp -r gs://biglake-public-nyc-taxi-iceberg/public_data/nyc_taxicab_2021/data/* gs://{bucket_name}/poc_raw_data/nyc_taxi/
 --   3. Execute the statements in sequence in BigQuery Studio.
 --
 -- KEY PATTERN:
@@ -39,6 +39,7 @@ OPTIONS (
 -- Step 3: Create BigLake Managed Iceberg Table from External Table via CTAS
 CREATE OR REPLACE TABLE `{project_id}.{dataset_id}.tlc_yellow_trips_2022_managed`
 WITH CONNECTION `{project_id}.{region}.{connection_id}`
+PARTITION BY RANGE_BUCKET(data_file_month, GENERATE_ARRAY(1, 12, 1))
 OPTIONS (
     file_format = 'PARQUET',
     table_format = 'ICEBERG'

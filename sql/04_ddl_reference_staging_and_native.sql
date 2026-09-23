@@ -26,8 +26,8 @@
 -- Step 1: Create BigLake Managed Iceberg Staging Table
 CREATE OR REPLACE TABLE `{project_id}.{dataset_id}.staging_iceberg_transaksi`
 (
-  id_transaksi INT64,
-  jumlah NUMERIC,
+  id_transaksi STRING,
+  jumlah FLOAT64,
   status STRING,
   tanggal_transaksi DATE,
   created_at TIMESTAMP,
@@ -39,22 +39,22 @@ OPTIONS (
   file_format = 'PARQUET',
   table_format = 'ICEBERG'
 )
-PARTITION BY DATE(tanggal_transaksi)
-CLUSTER BY status, id_transaksi;
+PARTITION BY tanggal_transaksi
+CLUSTER BY id_transaksi, status;
 
 -- Step 2: Create Final BigQuery Native Serving Table
 CREATE OR REPLACE TABLE `{project_id}.{dataset_id}.final_transaksi`
 (
-  id_transaksi INT64,
-  jumlah NUMERIC,
+  id_transaksi STRING,
+  jumlah FLOAT64,
   status STRING,
   tanggal_transaksi DATE,
   created_at TIMESTAMP,
   updated_at TIMESTAMP,
   deleted_at TIMESTAMP
 )
-PARTITION BY DATE(tanggal_transaksi)
-CLUSTER BY status, id_transaksi;
+PARTITION BY tanggal_transaksi
+CLUSTER BY id_transaksi, status;
 
 -- Step 3 : Create Source Table
 CREATE TABLE IF NOT EXISTS transaksi_bank (

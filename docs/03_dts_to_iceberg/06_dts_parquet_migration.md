@@ -2,7 +2,7 @@
 ## Part 3.1: GCS Staging Strategies (Post-Ingestion Deletion vs. Filename Detection) & BigQuery DTS Setup
 
 > **Section Overview & Core Staging Strategies:**  
-> For some reasons, the simplicity and ease of use often makes **BigQuery Data Transfer Service (DTS)** the preferred tool for ingestion. However, DTS cannot ingest directly from relational databases like MySQL without an intermediary landing zone in Google Cloud Storage (GCS).
+> For simplicity and ease of use, **BigQuery Data Transfer Service (DTS)** is often the preferred tool for lakehouse ingestion. While BigQuery DTS now features a native MySQL connector, that connector only supports loading into proprietary BigQuery native tables. **DTS cannot ingest from MySQL directly into BigLake Managed Apache Iceberg tables.** Therefore, to land relational data into an open Iceberg lakehouse format using DTS, data must first be staged as Parquet files in Google Cloud Storage (GCS).
 >
 > When designing the GCS staging layer for DTS ingestion, two primary operational scenarios exist:
 > 
@@ -22,7 +22,7 @@
 
 To bridge the gap between source databases and BigLake Managed Iceberg tables while bypassing the 1 MB SQL query parameter limit from Stage 2:
 
-1. **Extraction (Airflow / Script):** Queries MySQL for the latest CDC window (e.g., past 24 hours).
+1. **Extraction (Airflow / Script):** Queries MySQL for the latest incremental watermark window (e.g., past 24 hours).
 2. **In-Memory Transformation:** Converts the extracted DataFrame into Parquet in-memory using `io.BytesIO()`.  
    *Crucial fix:* Explicitly forces microsecond timestamp precision (`coerce_timestamps='us'`) to avoid BigQuery nanosecond rejection errors.
 3. **GCS Landing Zone:** Writes the Parquet file to GCS:

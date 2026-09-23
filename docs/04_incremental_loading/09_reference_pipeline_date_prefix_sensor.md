@@ -32,7 +32,7 @@ sequenceDiagram
     participant Iceberg as BigLake Managed Iceberg (staging_iceberg_transaksi)
     participant NativeBQ as BigQuery Native (final_transaksi)
 
-    Airflow->>MySQL: Extract CDC (WHERE DATE(updated_at) = ds)
+    Airflow->>MySQL: Extract Incremental Batch (WHERE DATE(updated_at) = ds)
     Airflow->>Airflow: Strictly cast types & force microsecond UTC (PyArrow)
     Airflow->>GCS: Upload Parquet file to date folder
     Airflow->>DTS: Trigger Transfer Run (Async Operator)
@@ -156,7 +156,7 @@ Avoids BigQuery `INVALID_ARGUMENT` precision errors by enforcing:
 - `pa.timestamp('us', tz='UTC')`: Guarantees UTC microsecond timestamps.
 
 ### C. Partition-Pruned Idempotent MERGE
-Uses `QUALIFY ROW_NUMBER() OVER(PARTITION BY id_transaksi ORDER BY updated_at DESC) = 1` to eliminate duplicate CDC transactions within the batch window, and enforces partition pruning in the `ON` clause to keep query scanning costs minimal.
+Uses `QUALIFY ROW_NUMBER() OVER(PARTITION BY id_transaksi ORDER BY updated_at DESC) = 1` to eliminate duplicate mutated records within the batch window, and enforces partition pruning in the `ON` clause to keep query scanning costs minimal.
 
 ---
 
