@@ -23,7 +23,7 @@ This repository serves as a **practical demonstration and architectural guidance
 
 ## 🗺️ Progressive 5-Stage Learning Roadmap
 
-The playbook is structured as a clear progression from foundational lakehouse storage concepts to hardened, production-grade automated pipelines:
+The playbook is structured as a step by step progression from foundational lakehouse concepts to hardened, production style automated pipelines:
 
 ```mermaid
 graph LR
